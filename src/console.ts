@@ -1,4 +1,3 @@
-import { NestFactory } from '@nestjs/core';
 import { CommandFactory } from 'nest-commander';
 import { ConsoleModule } from './console/console.module';
 

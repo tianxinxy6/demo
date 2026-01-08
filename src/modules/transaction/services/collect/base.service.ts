@@ -6,6 +6,8 @@ import { DatabaseService } from '@/shared/database/database.service';
 import { TransactionStatus } from '@/constants';
 import { SysWalletAddressService } from '@/modules/sys/services/sys-wallet.service';
 import { ConfigService } from '@nestjs/config';
+import { App } from 'supertest/types';
+import { AppConfigService } from '@/shared/services/config.service';
 
 /**
  * 归集服务基类
@@ -22,6 +24,9 @@ export abstract class BaseCollectService {
 
   @Inject()
   protected readonly configService: ConfigService;
+
+  @Inject()
+  protected readonly appConfigService: AppConfigService;
 
   @Inject()
   protected readonly chainAddressService: ChainAddressService;
@@ -43,9 +48,7 @@ export abstract class BaseCollectService {
       // 3. 初始化链连接
       await this.init();
 
-      this.collectAddress = await this.sysWalletAddressService.getCollectWalletAddress(
-        this.chainCode,
-      );
+      this.collectAddress = await this.appConfigService.getCollectWalletAddress(this.chainCode);
 
       // 4. 检查来源地址余额是否足够
       const balance = await this.getBalance(tx.to, tx.contract);

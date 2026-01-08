@@ -194,7 +194,7 @@ export class TronUtil {
 
     // 获取账户资源信息
     const accountResources = await this.tronWeb.trx.getAccountResources(address);
-
+    console.log('Account Resources:', accountResources);
     // 获取账户的总能量
     const totalEnergy = accountResources.EnergyLimit || 0;
     if (energyAmount > totalEnergy) {
@@ -280,6 +280,89 @@ export class TronUtil {
     );
 
     const signedTx = await this.tronWeb.trx.sign(tx);
+    return await this.tronWeb.trx.sendRawTransaction(signedTx);
+  }
+
+  /**
+   * 使用指定权限委托能量或带宽（支持多签场景）
+   * 适用场景：当前账户被 owner 授权，可以操作 owner 的资源
+   *
+   * @param ownerAddress 资源所有者地址（被授权的账户）
+   * @param receiverAddress 接收资源的目标地址
+   * @param amount 委托的资源数量（单位：SUN）
+   * @param resource 资源类型（ENERGY 或 BANDWIDTH）
+   * @param lock 是否锁定委托
+   * @param permissionId 使用的权限ID，默认为2（active权限）
+   * @returns 交易结果
+   */
+  async delegateResourceWithPermission(
+    ownerAddress: string,
+    receiverAddress: string,
+    amount: number,
+    resource: 'ENERGY' | 'BANDWIDTH' = 'ENERGY',
+    lock: boolean = false,
+    permissionId: number = 2,
+  ) {
+    // 创建交易时指定 ownerAddress
+    const tx = await this.tronWeb.transactionBuilder.delegateResource(
+      amount,
+      receiverAddress,
+      resource,
+      ownerAddress,
+      lock,
+    );
+
+    // 设置交易的 permissionId
+    (tx.raw_data as any).Permission_id = permissionId;
+
+    // 使用 multiSign 进行签名（即使只有一个签名者）
+    // 注意：multiSign 的第二个参数必须传入 privateKey，第三个参数是 permissionId
+    const signedTx = await this.tronWeb.trx.multiSign(
+      tx,
+      this.tronWeb.defaultPrivateKey,
+      permissionId,
+    );
+
+    return await this.tronWeb.trx.sendRawTransaction(signedTx);
+  }
+
+  /**
+   * 使用指定权限取消能量委托（支持多签场景）
+   * 适用场景：当前账户被 owner 授权，可以操作 owner 的资源
+   *
+   * @param ownerAddress 资源所有者地址（被授权的账户）
+   * @param receiverAddress 接收资源的目标地址
+   * @param amount 要回收的资源数量（单位：SUN）
+   * @param resource 资源类型（ENERGY 或 BANDWIDTH）
+   * @param permissionId 使用的权限ID，默认为2（active权限）
+   * @returns 交易结果
+   */
+  async undelegateResourceWithPermission(
+    ownerAddress: string,
+    receiverAddress: string,
+    amount: number,
+    resource: 'ENERGY' | 'BANDWIDTH' = 'ENERGY',
+    permissionId: number = 2,
+  ) {
+    // 创建交易时指定 ownerAddress
+    const tx = await this.tronWeb.transactionBuilder.undelegateResource(
+      amount,
+      receiverAddress,
+      resource,
+      ownerAddress,
+    );
+
+    // 设置交易的 permissionId
+    (tx.raw_data as any).Permission_id = permissionId;
+
+    // 使用 multiSign 进行签名（即使只有一个签名者）
+    // 注意：multiSign 的第二个参数必须传入 privateKey，第三个参数是 permissionId
+    const signedTx = await this.tronWeb.trx.multiSign(
+      tx,
+      this.tronWeb.defaultPrivateKey,
+      permissionId,
+    );
+
     return await this.tronWeb.trx.sendRawTransaction(signedTx);
   }
 

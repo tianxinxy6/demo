@@ -18,7 +18,9 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "docs:export": "node -r ts-node/register scripts/export-swagger.ts",
+    "docs:html": "redocly build-docs docs/swagger.json -o docs/api.html && redocly build-docs docs/swagger-merchant.json -o docs/api-merchant.html"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -67,6 +69,7 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
+    "@redocly/cli": "^2.14.3",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",

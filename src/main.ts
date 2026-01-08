@@ -11,7 +11,7 @@ import { AppModule } from './app.module';
 import { fastifyApp } from './common/adapters/fastify.adapter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { isDev, isMainProcess } from './global/env';
-import { setupSwagger } from './setup-swagger';
+import { setupSwagger, setupMerchantSwagger } from './setup-swagger';
 import compression from 'compression';
 
 declare const module: any;
@@ -62,6 +62,7 @@ async function bootstrap() {
   }
 
   const printSwaggerLog = setupSwagger(app, configService);
+  const printMerchantSwaggerLog = setupMerchantSwagger(app, configService);
 
   await app.listen(port, '0.0.0.0', async () => {
     const url = await app.getUrl();
@@ -72,6 +73,7 @@ async function bootstrap() {
     if (!isMainProcess) return;
 
     printSwaggerLog?.();
+    printMerchantSwaggerLog?.();
 
     const logger = new Logger('NestApplication');
     logger.log(`[${prefix + pid}] Server running on ${url}`);

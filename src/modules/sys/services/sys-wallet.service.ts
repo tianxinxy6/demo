@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { Status, SysWalletType, ErrorCode } from '@/constants';
 import { SysWalletAddressEntity } from '@/entities/sys-wallet-address.entity';
 import { AddressMgrService } from '@/shared/services/wallet.service';
-import { AppConfigService } from '@/shared/services/config.service';
 import { BusinessException } from '@/common/exceptions/biz.exception';
 import { generateRandomString, TronUtil } from '@/utils';
 
@@ -23,7 +22,6 @@ export class SysWalletAddressService {
     @InjectRepository(SysWalletAddressEntity)
     private readonly walletAddressRepository: Repository<SysWalletAddressEntity>,
     private readonly addressMgrService: AddressMgrService,
-    private readonly systemConfigService: AppConfigService,
   ) {}
 
   /**
@@ -95,24 +93,5 @@ export class SysWalletAddressService {
       throw new BusinessException(ErrorCode.ErrSysWalletNotFound);
     }
     return await this.addressMgrService.getPrivateKey(address.id, null, address.key);
-  }
-
-  /**
-   * 获取归集钱包地址
-   * 从 config 表中读取归集钱包地址配置
-   * @param chainType 链类型
-   * @returns 归集钱包地址
-   */
-  async getCollectWalletAddress(chainName: string): Promise<string | null> {
-    // 根据链类型构建配置键名
-    const configKey = `collect_wallet_address_${chainName.toLowerCase()}`;
-
-    // 从 config 表中获取归集钱包地址
-    const address = await this.systemConfigService.get(configKey);
-    if (!address) {
-      return null;
-    }
-
-    return address;
   }
 }

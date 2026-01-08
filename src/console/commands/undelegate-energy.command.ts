@@ -2,6 +2,7 @@ import { Command, CommandRunner, Option } from 'nest-commander';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SysWalletAddressService } from '@/modules/sys/services/sys-wallet.service';
+import { AppConfigService } from '@/shared/services/config.service';
 import { TronUtil } from '@/utils/tron.util';
 
 /**
@@ -28,6 +29,7 @@ export class UndelegateEnergyCommand extends CommandRunner {
   constructor(
     private readonly sysWalletService: SysWalletAddressService,
     private readonly configService: ConfigService,
+    private readonly appConfigService: AppConfigService,
   ) {
     super();
   }
@@ -62,25 +64,35 @@ export class UndelegateEnergyCommand extends CommandRunner {
       const resource = options.resource || 'ENERGY';
       const resourceName = resource === 'ENERGY' ? '能量' : '带宽';
 
-      // 获取能量钱包的私钥
-      // const privateKey = await this.sysWalletService.getEnergyWallet();
-      const privateKey = '91acc3b13609d1b6dffe32272bcd0d699107aebdf3812d0e0b66de1c21ff02bb';
-
       // 获取 TRON RPC URL
       const rpcUrl = this.configService.get<string>('tron.rpcUrl');
+
+      // 获取能量钱包的私钥
+      const privateKey = await this.sysWalletService.getEnergyWallet();
 
       // 创建 TronUtil 实例
       const tronUtil = new TronUtil(rpcUrl, privateKey);
 
-      // 获取发送方地址
-      const ownerAddress = tronUtil.getFromAddress();
+      // 获取能量所有者地址
+      const ownerAddress = await this.appConfigService.getEnergyOwnerWallet();
+      if (!ownerAddress) {
+        throw new Error('系统能量钱包地址未配置');
+      }
+
+      // 获取当前操作账户地址
+      const fromAddress = tronUtil.getFromAddress();
       console.log(`\n正在查询委托信息...`);
-      console.log(`  委托方: ${ownerAddress}`);
+      console.log(`  当前账户: ${fromAddress}`);
+      console.log(`  资源所有者: ${ownerAddress}`);
       console.log(`  接收方: ${options.from}`);
       console.log('');
 
       // 查询委托给该地址的资源数量
-      const delegatedAmount = await tronUtil.getDelegatedAmount(options.from, resource);
+      const delegatedAmount = await tronUtil.getDelegatedAmount(
+        options.from,
+        resource,
+        ownerAddress,
+      );
 
       if (delegatedAmount === 0) {
         console.log(`⚠️  未找到委托给地址 ${options.from} 的${resourceName}`);
@@ -98,7 +110,13 @@ export class UndelegateEnergyCommand extends CommandRunner {
 
       // 取消委托能量
       console.log(`正在执行取消委托交易...`);
-      const result = await tronUtil.undelegateResource(options.from, delegatedAmount, resource);
+
+      const result = await tronUtil.undelegateResourceWithPermission(
+        ownerAddress,
+        options.from,
+        delegatedAmount,
+        resource,
+      );
 
       if (result.result) {
         console.log(`✅ 取消${resourceName}委托成功!`);

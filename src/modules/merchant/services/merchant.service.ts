@@ -12,6 +12,7 @@ import { RentEnergyDto, ReclaimEnergyDto } from '../dto/rent.dto';
 import { RentEnergyResponse } from '../vo/energy.vo';
 import { ChainTokenService } from '@/modules/chain/services/token.service';
 import { trxPrice } from '@/constants/price.constant';
+import { AppConfigService } from '@/shared/services/config.service';
 
 @Injectable()
 export class MerchantService {
@@ -25,6 +26,7 @@ export class MerchantService {
     private readonly chainTokenService: ChainTokenService,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
+    private readonly appConfigService: AppConfigService,
   ) {
     const rpcUrl = this.configService.get<string>('tron.rpcUrl');
     this.tronUtil = new TronUtil(rpcUrl);
@@ -43,6 +45,12 @@ export class MerchantService {
     const isActivated = await this.tronUtil.checkAddressActivated(dto.receiverAddress);
     if (!isActivated) {
       throw new BusinessException(ErrorCode.ErrAddressNotActivated);
+    }
+
+    const ownerAddress = await this.appConfigService.getEnergyOwnerWallet();
+    if (!ownerAddress) {
+      this.logger.warn('能量所有者地址未配置');
+      throw new BusinessException(ErrorCode.ErrAddressInvalid);
     }
 
     // 3. 计算租赁价格和时长
@@ -92,7 +100,11 @@ export class MerchantService {
       });
 
       // 9. 执行链上能量委托
-      const result = await this.tronUtil.delegateResource(dto.receiverAddress, trxAmount);
+      const result = await this.tronUtil.delegateResourceWithPermission(
+        ownerAddress,
+        dto.receiverAddress,
+        trxAmount,
+      );
       if (!result.result) {
         this.logger.error(
           `链上委托失败: 订单${order.orderNo}, 用户${userId}, 原因: ${result.code}`,
@@ -219,9 +231,6 @@ export class MerchantService {
       receiverAddress: order.receiverAddress,
       price: Number(TronUtil.fromSun(order.price)),
       duration: order.duration,
-      status: order.status,
-      createdAt: order.createdAt,
-      expireAt: order.expireAt,
     };
   }
 }

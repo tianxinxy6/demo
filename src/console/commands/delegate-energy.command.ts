@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SysWalletAddressService } from '@/modules/sys/services/sys-wallet.service';
 import { TronUtil } from '@/utils/tron.util';
+import { AppConfigService } from '@/shared/services/config.service';
 
 /**
  * 委托能量命令
@@ -30,6 +31,7 @@ export class DelegateEnergyCommand extends CommandRunner {
   constructor(
     private readonly sysWalletService: SysWalletAddressService,
     private readonly configService: ConfigService,
+    private readonly appConfigService: AppConfigService,
   ) {
     super();
   }
@@ -76,11 +78,15 @@ export class DelegateEnergyCommand extends CommandRunner {
       const rpcUrl = this.configService.get<string>('tron.rpcUrl');
 
       // 获取能量钱包的私钥
-      // const privateKey = await this.sysWalletService.getEnergyWallet();
-      const privateKey = '91acc3b13609d1b6dffe32272bcd0d699107aebdf3812d0e0b66de1c21ff02bb';
+      const privateKey = await this.sysWalletService.getEnergyWallet();
 
       // 创建 TronUtil 实例
       const tronUtil = new TronUtil(rpcUrl, privateKey);
+
+      const ownerAddress = await this.appConfigService.getEnergyOwnerWallet();
+      if (!ownerAddress) {
+        throw new Error('系统能量钱包地址未配置');
+      }
 
       // 计算需要质押的TRX数量
       let trxAmount: number; // 单位：TRX
@@ -91,7 +97,7 @@ export class DelegateEnergyCommand extends CommandRunner {
         energyAmount = options.energy;
 
         // 获取当前能量转换比例（从链上查询更准确）
-        trxAmount = await tronUtil.convertEnergyToTrx(energyAmount);
+        trxAmount = await tronUtil.convertEnergyToTrx(energyAmount, ownerAddress);
 
         console.log(`\n💡 根据能量计算TRX数量:`);
         console.log(`  请求能量: ${energyAmount.toLocaleString()}`);
@@ -124,11 +130,13 @@ export class DelegateEnergyCommand extends CommandRunner {
       // 获取发送方地址
       const fromAddress = tronUtil.getFromAddress();
       console.log(`  发送方地址: ${fromAddress}`);
+      console.log(`  资源所有者: ${ownerAddress}`);
       console.log('');
 
       // 委托能量
       console.log(`正在执行委托交易...`);
-      const result = await tronUtil.delegateResource(
+      const result = await tronUtil.delegateResourceWithPermission(
+        ownerAddress,
         options.to,
         trxAmount, // 传入的是TRX数量（SUN单位），必须是整数
         resource,

@@ -161,4 +161,24 @@ export class AppConfigService {
       throw error;
     }
   }
+
+  /**
+   * 获取归集钱包地址
+   * 从 config 表中读取归集钱包地址配置
+   * @param chainType 链类型
+   * @returns 归集钱包地址
+   */
+  async getCollectWalletAddress(chainName: string): Promise<string | null> {
+    // 根据链类型构建配置键名
+    const configKey = `collect_wallet_address_${chainName.toLowerCase()}`;
+
+    return await this.get(configKey);
+  }
+
+  async getEnergyOwnerWallet(): Promise<string | null> {
+    // 根据链类型构建配置键名
+    const configKey = `energy_owner_address`;
+
+    return await this.get(configKey);
+  }
 }
