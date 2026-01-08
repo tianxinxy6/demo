@@ -25,8 +25,8 @@ import { SysModule } from '../sys/sys.module';
     // 定时任务
     ScanTask,
     ConfirmTask,
-    WithdrawTask,
-    MarketPriceTask,
+    // WithdrawTask,
+    // MarketPriceTask,
     DelegateReclaimTask, // 委托订单能量回收任务
   ],
 })
