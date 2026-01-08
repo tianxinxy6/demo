@@ -14,7 +14,7 @@ export class RentEnergyDto {
   @ApiProperty({ description: '租赁时长(分钟)', enum: [10, 60, 1440] })
   @IsNumber()
   @IsIn([10, 60, 1440])
-  duration: number;
+  minutes: number;
 }
 
 export class ReclaimEnergyDto {

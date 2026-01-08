@@ -18,6 +18,9 @@ export class OrderDelegateEntity extends CommonDEntity {
   @Column({ comment: '能量数量', name: 'energy_amount', type: 'bigint' })
   energyAmount: number;
 
+  @Column({ comment: 'TRX数量', name: 'trx_amount', type: 'bigint' })
+  trxAmount: number;
+
   @Column({ comment: '租赁时长(s)', name: 'duration', type: 'int' })
   duration: number;
 

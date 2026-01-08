@@ -32,13 +32,6 @@ export class MerchantController {
     return this.merchantService.rentEnergy(user.uid, dto);
   }
 
-  @Post('energy/reclaim')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '回收能量' })
-  async reclaimEnergy(@AuthUser() user: IAuthUser, @Body() dto: ReclaimEnergyDto): Promise<void> {
-    return this.merchantService.reclaimEnergy(user.uid, dto);
-  }
-
   /**
    * 获取我的钱包列表
    */

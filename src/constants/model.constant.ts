@@ -107,9 +107,7 @@ export enum TransferStatus {
  */
 export enum DelegateStatus {
   Pending = 0, // 待处理
-  Processing = 1, // 处理中
-  Success = 2, // 成功
-  Failed = 3, // 失败
-  Expired = 4, // 已过期
-  Reclaimed = 5, // 已回收
+  Success = 1, // 成功
+  Reclaimed = 2, // 已回收
+  Failed = 3, // 回收失败
 }

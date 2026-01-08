@@ -32,6 +32,7 @@ export class DelegateService {
       userId: dto.userId,
       receiverAddress: dto.receiverAddress,
       energyAmount: dto.energyAmount,
+      trxAmount: dto.trxAmount,
       duration: dto.duration,
       price: dto.price,
       token: token.code,
@@ -98,7 +99,7 @@ export class DelegateService {
   /**
    * 查询已过期但未回收的订单
    */
-  async findExpiredOrders(limit = 100): Promise<OrderDelegateEntity[]> {
+  async findExpiredOrders(limit = 20): Promise<OrderDelegateEntity[]> {
     return await this.delegateRepo
       .createQueryBuilder('order')
       .where('order.status = :status', { status: DelegateStatus.Success })

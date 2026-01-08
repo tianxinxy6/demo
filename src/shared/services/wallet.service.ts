@@ -4,6 +4,11 @@ import * as crypto from 'crypto';
 import { ErrorCode } from '@/constants';
 import { VaultService } from './vault.service';
 import { BusinessException } from '@/common/exceptions/biz.exception';
+import { TronAddressInfo } from '@/utils';
+
+interface GeneratedAddress extends TronAddressInfo {
+  secKey: string;
+}
 
 /**
  * 钱包地址管理服务

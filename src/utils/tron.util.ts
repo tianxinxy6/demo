@@ -29,18 +29,14 @@ export class TronUtil {
    * 生成 TRON 地址 (静态方法)
    */
   static async generate(): Promise<TronAddressInfo> {
-    try {
-      const account = await TronWeb.createAccount();
+    const account = await TronWeb.createAccount();
 
-      return {
-        address: account.address.base58,
-        publicKey: account.publicKey,
-        privateKey: account.privateKey,
-        hexAddress: account.address.hex,
-      };
-    } catch (error) {
-      throw new Error(`Failed to generate TRON address: ${error.message}`);
-    }
+    return {
+      address: account.address.base58,
+      publicKey: account.publicKey,
+      privateKey: account.privateKey,
+      hexAddress: account.address.hex,
+    };
   }
 
   /**
@@ -81,58 +77,10 @@ export class TronUtil {
   }
 
   /**
-   * 规范化 TRON 地址
-   */
-  static normalize(address: string): string {
-    try {
-      return address.toUpperCase();
-    } catch (error) {
-      throw new Error(`Failed to normalize TRON address: ${error.message}`);
-    }
-  }
-
-  /**
-   * 将 TRON 地址转换为十六进制格式
-   */
-  static addressToHex(address: string): string {
-    try {
-      return TronWeb.address.toHex(address);
-    } catch (error) {
-      throw new Error(`Failed to convert TRON address to hex: ${error.message}`);
-    }
-  }
-
-  /**
    * 将十六进制地址转换为 TRON 地址格式
    */
   static hexToAddress(hexAddress: string): string {
-    try {
-      return TronWeb.address.fromHex(hexAddress);
-    } catch (error) {
-      throw new Error(`Failed to convert hex to TRON address: ${error.message}`);
-    }
-  }
-
-  /**
-   * 地址校验和 - TronWeb 6.x 新功能
-   */
-  static toChecksumAddress(address: string): string {
-    try {
-      return TronWeb.address.toChecksumAddress(address);
-    } catch (error) {
-      throw new Error(`Failed to convert to checksum address: ${error.message}`);
-    }
-  }
-
-  /**
-   * 验证地址校验和 - TronWeb 6.x 新功能
-   */
-  static isChecksumAddress(address: string): boolean {
-    try {
-      return TronWeb.address.isChecksumAddress(address);
-    } catch (error) {
-      return false;
-    }
+    return TronWeb.address.fromHex(hexAddress);
   }
 
   async getContract(contract: string): Promise<Types.ContractInstance<Types.ContractAbiInterface>> {
@@ -155,22 +103,14 @@ export class TronUtil {
    * 获取交易信息
    */
   async getTransaction(txHash: string): Promise<Types.GetTransactionResponse | null> {
-    try {
-      return await this.tronWeb.trx.getTransaction(txHash);
-    } catch (error) {
-      throw new Error(`Failed to get TRON transaction: ${error.message}`);
-    }
+    return await this.tronWeb.trx.getTransaction(txHash);
   }
 
   /**
    * 获取交易详细信息（包含费用等信息）
    */
   async getTransactionInfo(txHash: string): Promise<Types.TransactionInfo> {
-    try {
-      return await this.tronWeb.trx.getTransactionInfo(txHash);
-    } catch (error) {
-      throw new Error(`Failed to get TRON transaction info: ${error.message}`);
-    }
+    return await this.tronWeb.trx.getTransactionInfo(txHash);
   }
 
   /**
@@ -199,10 +139,6 @@ export class TronUtil {
    */
   async sendTrx(to: string, amount: number): Promise<string> {
     try {
-      if (!this.tronWeb.defaultPrivateKey) {
-        throw new Error('Private key not provided in constructor');
-      }
-
       const fromAddress = this.getFromAddress();
       if (!fromAddress) {
         throw new Error('Failed to derive address from private key');
@@ -217,7 +153,7 @@ export class TronUtil {
       // 广播交易
       const broadcast = await this.tronWeb.trx.sendRawTransaction(signedTx);
       if (!broadcast.result) {
-        throw new Error(`Transaction failed: ${broadcast.code || 'Unknown error'}`);
+        throw new Error(`Transaction failed: ${TronUtil.parseMessage(broadcast.message)}`);
       }
 
       return broadcast.txid;
@@ -236,6 +172,65 @@ export class TronUtil {
     return await contractInstance.transfer(to, amount).send({
       from: fromAddress,
     });
+  }
+
+  /**
+   * 将能量数量转换为需要委托的 TRX 数量（单位：SUN）
+   *
+   * 原理：
+   * 1. 查询账户已质押的 TRX 数量（通过 getDelegatedResourceAccountIndexV2）
+   * 2. 查询账户的总能量（EnergyLimit）
+   * 3. 计算比例：委托TRX = (委托能量 / 总能量) × 质押TRX
+   *
+   * @param energyAmount 要委托的能量数量
+   * @param fromAddress 委托方地址（可选，默认使用当前实例地址）
+   * @returns 需要委托的 TRX 数量（单位：SUN）
+   */
+  async convertEnergyToTrx(energyAmount: number, fromAddress?: string): Promise<number> {
+    const address = fromAddress || this.getFromAddress();
+    if (!address) {
+      return 0;
+    }
+
+    // 获取账户资源信息
+    const accountResources = await this.tronWeb.trx.getAccountResources(address);
+
+    // 获取账户的总能量
+    const totalEnergy = accountResources.EnergyLimit || 0;
+    if (energyAmount > totalEnergy) {
+      return 0;
+    }
+
+    // 获取账户信息，查找质押的 TRX
+    const account = await this.tronWeb.trx.getAccount(address);
+
+    // 从 account_resource 中获取质押的 TRX（Stake 2.0）
+    // frozenV2 是 Stake 2.0 的质押信息
+    let stakedTrxForEnergy = 0;
+
+    if (account.frozenV2) {
+      // Stake 2.0: 遍历 frozenV2 数组找到 ENERGY 类型的质押
+      for (const frozen of account.frozenV2) {
+        if (frozen.type === 'ENERGY') {
+          stakedTrxForEnergy += frozen.amount || 0;
+        }
+      }
+    }
+
+    // 如果使用旧版 Stake 1.0（已废弃，但仍需兼容）
+    if (stakedTrxForEnergy === 0 && account.account_resource?.frozen_balance_for_energy) {
+      stakedTrxForEnergy = account.account_resource.frozen_balance_for_energy.frozen_balance || 0;
+    }
+
+    if (stakedTrxForEnergy === 0) {
+      return 0;
+    }
+
+    // 计算需要委托的 TRX 数量（SUN）
+    // 公式：委托TRX = (委托能量 / 总能量) × 质押TRX
+    const trxToDelegate = (energyAmount / totalEnergy) * stakedTrxForEnergy;
+
+    return Math.floor(trxToDelegate);
   }
 
   /**
@@ -286,6 +281,52 @@ export class TronUtil {
 
     const signedTx = await this.tronWeb.trx.sign(tx);
     return await this.tronWeb.trx.sendRawTransaction(signedTx);
+  }
+
+  /**
+   * 查询委托给指定地址的资源数量
+   * @param toAddress 接收资源的目标地址
+   * @param resource 资源类型（ENERGY 或 BANDWIDTH）
+   * @param fromAddress 委托方地址（可选，默认使用当前实例地址）
+   * @returns 委托的资源数量（单位：SUN），如果没有委托则返回 0
+   */
+  async getDelegatedAmount(
+    toAddress: string,
+    resource: 'ENERGY' | 'BANDWIDTH' = 'ENERGY',
+    fromAddress?: string,
+  ): Promise<number> {
+    const ownerAddress = fromAddress || this.getFromAddress();
+    if (!ownerAddress) {
+      return 0;
+    }
+
+    try {
+      // 使用 getDelegatedResourceV2 查询委托信息
+      const delegatedInfo = await this.tronWeb.trx.getDelegatedResourceV2(ownerAddress, toAddress);
+      if (!delegatedInfo || !delegatedInfo.delegatedResource) {
+        return 0;
+      }
+
+      const delegatedResources = delegatedInfo.delegatedResource;
+
+      // 处理数组或对象两种情况（兼容不同版本的 TronWeb）
+      const resources = Array.isArray(delegatedResources)
+        ? delegatedResources
+        : [delegatedResources];
+
+      for (const item of resources) {
+        if (resource === 'ENERGY' && item.frozen_balance_for_energy) {
+          return item.frozen_balance_for_energy;
+        } else if (resource === 'BANDWIDTH' && item.frozen_balance_for_bandwidth) {
+          return item.frozen_balance_for_bandwidth;
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      // 查询失败或没有委托记录时返回 0
+      return 0;
+    }
   }
 
   getFromAddress(): string | false {
@@ -522,6 +563,39 @@ export class TronUtil {
       return { energyPrice, bandwidthPrice };
     } catch (error) {
       return { energyPrice: 100n, bandwidthPrice: 1000n };
+    }
+  }
+
+  /**
+   * 解析 TRON 返回的错误消息
+   * 将十六进制格式的错误信息解码为可读文本
+   * @param message 错误消息（可能是十六进制格式）
+   * @returns 解码后的错误消息
+   */
+  static parseMessage(message: string): string {
+    if (!message) {
+      return '未知错误';
+    }
+
+    try {
+      // 检查是否为十六进制字符串（只包含 0-9 和 a-f）
+      if (/^[0-9a-fA-F]+$/.test(message) && message.length % 2 === 0) {
+        // 将十六进制转换为 Buffer
+        const buffer = Buffer.from(message, 'hex');
+        // 解码为 UTF-8 字符串
+        const decoded = buffer.toString('utf8');
+
+        // 检查解码结果是否包含可打印字符
+        if (/[\x20-\x7E]/.test(decoded)) {
+          return decoded;
+        }
+      }
+
+      // 如果不是十六进制或解码失败，返回原始消息
+      return message;
+    } catch (error) {
+      // 解析失败时返回原始消息
+      return message;
     }
   }
 }

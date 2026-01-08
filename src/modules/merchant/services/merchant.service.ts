@@ -11,6 +11,7 @@ import { DelegateService } from '@/modules/order/services/delegate.service';
 import { RentEnergyDto, ReclaimEnergyDto } from '../dto/rent.dto';
 import { RentEnergyResponse } from '../vo/energy.vo';
 import { ChainTokenService } from '@/modules/chain/services/token.service';
+import { trxPrice } from '@/constants/price.constant';
 
 @Injectable()
 export class MerchantService {
@@ -45,9 +46,8 @@ export class MerchantService {
     }
 
     // 3. 计算租赁价格和时长
-    const priceInTrx = this.calcRentPrice(dto.energyAmount, dto.duration);
-    const priceInSun = Number(TronUtil.toSun(priceInTrx));
-    const durationSeconds = dto.duration * 60; // 分钟转秒
+    const priceInSun = this.calcRentPrice(dto.energyAmount, dto.minutes);
+    const durationSeconds = dto.minutes * 60; // 分钟转秒
 
     // 7. 获取系统能量钱包私钥
     const sysPrivateKey = await this.sysWalletService.getEnergyWallet();
@@ -56,6 +56,11 @@ export class MerchantService {
     // 4. 检查平台可用能量是否足够
     const platformEnergy = await this.tronUtil.getAccountEnergy();
     if (platformEnergy < dto.energyAmount) {
+      throw new BusinessException(ErrorCode.ErrDelegateEnergyInsufficient);
+    }
+
+    const trxAmount = await this.tronUtil.convertEnergyToTrx(dto.energyAmount);
+    if (trxAmount == 0) {
       throw new BusinessException(ErrorCode.ErrDelegateEnergyInsufficient);
     }
 
@@ -71,6 +76,7 @@ export class MerchantService {
         orderNo: generateOrderNo(),
         userId,
         receiverAddress: dto.receiverAddress,
+        trxAmount,
         energyAmount: dto.energyAmount,
         duration: durationSeconds,
         price: priceInSun,
@@ -86,7 +92,7 @@ export class MerchantService {
       });
 
       // 9. 执行链上能量委托
-      const result = await this.tronUtil.delegateResource(dto.receiverAddress, dto.energyAmount);
+      const result = await this.tronUtil.delegateResource(dto.receiverAddress, trxAmount);
       if (!result.result) {
         this.logger.error(
           `链上委托失败: 订单${order.orderNo}, 用户${userId}, 原因: ${result.code}`,
@@ -177,19 +183,30 @@ export class MerchantService {
 
   /**
    * 计算租赁价格 (TRX)
-   * 2026年1月最新价格：65000能量10分钟约3TRX
-   * 基础单价：65000能量10分钟 = 3TRX
+   * 使用向上取值策略：如果请求的分钟数在两个档位之间，使用较高档位的价格
+   * 例如：30分钟会使用60分钟的价格
    */
-  private calcRentPrice(energyAmount: number, duration: number): number {
-    // 基准：65000能量/分钟 = 3 TRX
-    const baseEnergy = 65000;
-    const basePricePer = 3;
+  private calcRentPrice(energyAmount: number, minutes: number): number {
+    // 按分钟数升序排序价格配置
+    const sortedPrices = [...trxPrice].sort((a, b) => a.minutes - b.minutes);
 
-    // 计算价格
-    const price = (energyAmount / baseEnergy) * basePricePer * duration;
+    // 查找大于等于请求分钟数的最小档位（向上取值）
+    let pricePerEnergy = sortedPrices[sortedPrices.length - 1].price; // 默认使用最高档位
 
-    // 保留小数点后2位
-    return Math.ceil(price * 100) / 100;
+    for (const config of sortedPrices) {
+      if (config.minutes >= minutes) {
+        pricePerEnergy = config.price;
+        break;
+      }
+    }
+
+    // 如果请求的分钟数小于最小档位，抛出异常
+    if (minutes < sortedPrices[0].minutes) {
+      pricePerEnergy = sortedPrices[0].price;
+    }
+
+    // 计算总价格（SUN）= 能量数量 × 单价
+    return energyAmount * pricePerEnergy;
   }
 
   /**

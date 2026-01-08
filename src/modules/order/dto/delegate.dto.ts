@@ -14,6 +14,8 @@ export class CreateDelegateOrderDto {
   @Min(32000)
   energyAmount: number;
 
+  trxAmount: number;
+
   @IsNumber()
   @Min(1)
   duration: number;
