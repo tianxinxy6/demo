@@ -70,9 +70,7 @@ export class ApiKeyGuard implements CanActivate {
     this.adminApiSecret = this.configService.get<string>('app.admin.apiSecret', '');
 
     if (!this.adminApiKey || !this.adminApiSecret) {
-      this.logger.warn('⚠️ Admin API Key 或 Secret 未配置，API Key 守卫已禁用');
-    } else {
-      this.logger.log('✅ Admin API Key 守卫已启用');
+      throw new Error('⚠️ Admin API Key 或 Secret 未配置，无法启动 ApiKeyGuard');
     }
   }
 
@@ -80,7 +78,7 @@ export class ApiKeyGuard implements CanActivate {
     // 如果未配置，则跳过验证（开发环境）
     if (!this.adminApiKey || !this.adminApiSecret) {
       this.logger.warn('⚠️ Admin API Key 未配置，跳过验证');
-      return true;
+      return false;
     }
 
     const request = context.switchToHttp().getRequest<FastifyRequest>();

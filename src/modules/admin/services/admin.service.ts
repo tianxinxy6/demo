@@ -65,7 +65,7 @@ export class AdminService {
       await manager.save(MerchantEntity, merchant);
 
       // 为商户创建钱包
-      this.addressService.createAndGet(savedUser.id);
+      await this.addressService.createAndGet(savedUser.id);
 
       return { apiKey, apiSecret };
     });

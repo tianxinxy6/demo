@@ -26,7 +26,7 @@ import { getClientIp } from '@/utils';
 @Injectable()
 export class ApiAuthGuard implements CanActivate {
   private readonly logger = new Logger(ApiAuthGuard.name);
-  private readonly TIMESTAMP_WINDOW = 60000; // 时间窗口60秒
+  private readonly TIMESTAMP_WINDOW = 30000; // 时间窗口30秒
   private readonly CACHE_TTL = 600; // API Key缓存10分钟
 
   constructor(

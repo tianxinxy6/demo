@@ -54,7 +54,7 @@ import { AdminModule } from './modules/admin/admin.module';
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
     {
       provide: APP_INTERCEPTOR,
-      useFactory: () => new TimeoutInterceptor(15 * 1000),
+      useFactory: () => new TimeoutInterceptor(30 * 1000),
     },
     { provide: APP_INTERCEPTOR, useClass: IdempotenceInterceptor },
 

@@ -10,6 +10,7 @@ import { Status, WalletLogType, ErrorCode } from '@/constants';
 import { generateOrderNo } from '@/utils';
 import { BusinessException } from '@/common/exceptions/biz.exception';
 import { ChainTokenService } from '@/modules/chain/services/token.service';
+import Decimal from 'decimal.js';
 
 /**
  * 闪兑计算结果
@@ -89,13 +90,13 @@ export class SwapService {
     ]);
 
     // 计算兑换比例和目标金额
-    const fromPrice = parseFloat(fromPriceData.price);
-    const toPrice = parseFloat(toPriceData.price);
-    const rate = fromPrice / toPrice;
+    const fromPrice = new Decimal(fromPriceData.price);
+    const toPrice = new Decimal(toPriceData.price);
+    const rate = fromPrice.div(toPrice);
 
     // 计算目标代币数量（保持精度）
-    const toAmountFloat = amount * rate;
-    const toAmount = BigInt(Math.floor(toAmountFloat * 10 ** toToken.decimals));
+    const toAmountFloat = new Decimal(amount).mul(rate);
+    const toAmount = BigInt(Math.floor(toAmountFloat.toNumber() * 10 ** toToken.decimals));
 
     if (toAmount <= 0n) {
       throw new BusinessException(ErrorCode.ErrSwapAmountTooSmall);
