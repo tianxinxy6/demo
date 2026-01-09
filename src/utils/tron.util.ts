@@ -497,11 +497,12 @@ export class TronUtil {
 
     // 计算带宽费用
     const freeNetLimit = accountResources.freeNetLimit || 0;
+    const netLimit = accountResources.NetLimit || 0;
     const freeNetUsed = accountResources.freeNetUsed || 0;
     return {
       energy: energyLimit - energyUsed,
       totalEnergy: energyLimit,
-      bandwidth: freeNetLimit - freeNetUsed,
+      bandwidth: freeNetLimit + netLimit - freeNetUsed,
       totalBandwidth: freeNetLimit,
     };
   }
