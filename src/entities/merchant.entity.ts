@@ -1,4 +1,4 @@
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, Index } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { CommonDEntity } from '@/common/entities/common.entity';
 import { Status } from '@/constants';
@@ -7,6 +7,7 @@ import { Status } from '@/constants';
  * 商户实体
  */
 @Entity({ name: 'merchant', comment: 'api秘钥表' })
+@Index('idx_name', ['name'], { unique: true })
 export class MerchantEntity extends CommonDEntity {
   @Column({ comment: '用户ID', name: 'user_id', type: 'bigint' })
   userId: number;

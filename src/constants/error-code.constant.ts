@@ -137,4 +137,11 @@ export enum ErrorCode {
   ErrDelegateEnergyInsufficient = '33105:平台可租赁能量不足',
   ErrDelegateAmountInvalid = '33106:能量数量必须大于32000',
   ErrDelegateDurationInvalid = '33107:租赁时长无效',
+
+  // admin (34xxx)
+  ErrAdminApiKeyMissing = '34101:Admin API Key 缺失',
+  ErrAdminApiKeyInvalid = '34102:Admin API Key 无效',
+  ErrAdminSignatureMissing = '34103:Admin 签名信息缺失',
+  ErrAdminSignatureInvalid = '34104:Admin 签名验证失败',
+  ErrAdminMerchantNameExists = '34105:商户名称已存在',
 }

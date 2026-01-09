@@ -27,6 +27,10 @@ export default registerAs('app', () => ({
     enabled: envBoolean('SIGNATURE_ENABLED', false),
     secret: env('SIGNATURE_SECRET'),
   },
+  admin: {
+    apiKey: env('ADMIN_API_KEY'),
+    apiSecret: env('ADMIN_API_SECRET'),
+  },
   vault: {
     address: env('VAULT_ADDR', 'http://localhost:8200'),
     token: env('VAULT_TOKEN', 'dev-root-token'),

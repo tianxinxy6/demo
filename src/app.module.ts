@@ -20,6 +20,7 @@ import { SysModule } from './modules/sys/sys.module';
 import { MarketModule } from './modules/market/market.module';
 import { ValidationPipe } from './common/pipes/validation.pipe';
 import { MerchantModule } from './modules/merchant/merchant.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { MerchantModule } from './modules/merchant/merchant.module';
     SysModule,
     MarketModule,
     MerchantModule,
+    AdminModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -5,10 +5,12 @@ import type { FastifyRequest } from 'fastify';
 
 import { BusinessException } from '@/common/exceptions/biz.exception';
 import { ErrorCode } from '@/constants/error-code.constant';
-import { SIGNATURE_HEADER, TIMESTAMP_HEADER } from '@/constants/signature.constant';
 import { SignatureUtil } from '@/utils/signature.util';
 
 export const SKIP_SIGNATURE_KEY = Symbol('__skip_signature__');
+
+const SIGNATURE_HEADER = 'x-signature';
+const TIMESTAMP_HEADER = 'x-timestamp';
 
 /**
  * 签名验证守卫

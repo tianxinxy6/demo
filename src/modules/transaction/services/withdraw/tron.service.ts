@@ -124,12 +124,14 @@ export class TronWithdrawService extends BaseWithdrawService {
         return;
       }
 
-      const gasFee = await this.tronUtil.calculateTrc20TransFee(
+      const gasInfo = await this.tronUtil.calculateTrc20TransFee(
         this.addressFrom,
         order.contract,
         order.to,
         amount,
       );
+
+      const gasFee = gasInfo.gas;
       // 检查 ETH 余额是否足够支付 gas费
       const trxBalance = await this.getBalance(fromAddress);
       if (trxBalance < BigInt(gasFee)) {
