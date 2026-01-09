@@ -12,17 +12,17 @@
 import { TronUtil } from '../src/utils/tron.util';
 
 // ==================== 配置区 ====================
-const TRON_NODE_URL = 'https://api.trongrid.io'; // TRON 节点 URL
-// const TRON_NODE_URL = 'https://nile.trongrid.io'; // Nile 测试网
+// const TRON_NODE_URL = 'https://api.trongrid.io'; // TRON 节点 URL
+const TRON_NODE_URL = 'https://nile.trongrid.io'; // Nile 测试网
 
 // 示例地址（可以替换为实际地址）
 const FROM_ADDRESS = 'TEZsqCWQU4cvjxDJrGYqQMeCqU8NeXdpSg'; // 发送方地址
 const TO_ADDRESS = 'TDc1uFKbrWN19hQx5vh2chpHVUH9WTc72F'; // 接收方地址
 
 // USDT TRC20 合约地址（主网）
-const USDT_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
+// const USDT_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 // nile USDT 合约地址
-// const USDT_CONTRACT = 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf';
+const USDT_CONTRACT = 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf';
 
 // 转账金额
 const TRX_AMOUNT = 10; // 10 TRX（单位：TRX）
@@ -99,19 +99,6 @@ async function calculateTrc20TransferFee(tronUtil: TronUtil) {
     console.log(`接收方地址: ${TO_ADDRESS}`);
     console.log(`合约地址: ${USDT_CONTRACT}`);
     console.log(`转账金额: ${USDT_AMOUNT} USDT`);
-    console.log();
-
-    // 估算带宽和能量
-    const { bandwidth, energy } = await tronUtil.estimateTrc20Transaction(
-      FROM_ADDRESS,
-      USDT_CONTRACT,
-      TO_ADDRESS,
-      amountInBase,
-    );
-
-    console.log(`📊 预估资源消耗:`);
-    console.log(`  - Bandwidth: ${bandwidth}`);
-    console.log(`  - Energy: ${energy}`);
     console.log();
 
     // 计算手续费

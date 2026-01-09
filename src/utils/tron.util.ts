@@ -467,14 +467,7 @@ export class TronUtil {
     toAddress: string,
     amount: number,
   ): Promise<GasInfo> {
-    const { bandwidth, energy } = await this.estimateTrc20Transaction(
-      address,
-      contractAddress,
-      toAddress,
-      amount,
-    );
-
-    return await this.calculateTrxFee(address, bandwidth, energy);
+    return await this.calculateTrxFee(address, this.TRC20_BANDWIDTH, this.TRC20_ENERGY);
   }
 
   /**
@@ -535,45 +528,6 @@ export class TronUtil {
       energyShortage,
       bandwidthShortage,
     };
-  }
-
-  /**
-   * 完整估算 TRC20 转账的带宽和能量消耗
-   * @param fromAddress 转账发起地址
-   * @param contractAddress TRC20 合约地址
-   * @param toAddress 接收地址
-   * @param amount 转账数量
-   * @returns 带宽和能量的预估值
-   */
-  async estimateTrc20Transaction(
-    fromAddress: string,
-    contractAddress: string,
-    toAddress: string,
-    amount: number,
-  ): Promise<{ bandwidth: number; energy: number }> {
-    // 使用 triggerSmartContract 模拟执行
-    const parameter = [
-      { type: 'address', value: toAddress },
-      { type: 'uint256', value: amount },
-    ];
-
-    const transaction = await this.tronWeb.transactionBuilder.triggerSmartContract(
-      contractAddress,
-      'transfer(address,uint256)',
-      { feeLimit: 100_000_000 },
-      parameter,
-      fromAddress,
-    );
-
-    // 估算带宽:根据交易大小
-    const bandwidth = transaction?.transaction
-      ? JSON.stringify(transaction.transaction).length
-      : this.TRC20_BANDWIDTH;
-
-    // 估算能量:从返回结果中获取
-    const energy = transaction?.energy_used || this.TRC20_ENERGY;
-
-    return { bandwidth, energy };
   }
 
   /**
