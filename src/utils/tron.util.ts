@@ -1,5 +1,4 @@
 import { TronWeb, Types } from 'tronweb';
-import { add } from 'winston';
 
 export interface TronAddressInfo {
   address: string;
@@ -30,7 +29,7 @@ export class TronUtil {
   // TRON 资源消耗常量(固定值)
   private readonly TRX_BANDWIDTH = 270; // TRX 转账固定消耗
   private readonly TRC20_BANDWIDTH = 360; // TRC20 转账固定消耗
-  private readonly TRC20_ENERGY = 31895; // TRC20 转账典型能量消耗(USDT等标准合约)
+  private readonly TRC20_ENERGY = 65000; // TRC20 转账典型能量消耗(USDT等标准合约)
 
   constructor(nodeUrl: string, privateKey?: string) {
     this.tronWeb = new TronWeb({
@@ -458,9 +457,7 @@ export class TronUtil {
   }
 
   async calculateTrxTransFee(address: string, toAddress: string, amount: number): Promise<bigint> {
-    const bandwidth = await this.estimateTrxBandwidth(address, toAddress, amount);
-
-    const gasInfo = await this.calculateTrxFee(address, bandwidth, 0);
+    const gasInfo = await this.calculateTrxFee(address, this.TRX_BANDWIDTH, 0);
     return gasInfo.gas;
   }
 
@@ -538,30 +535,6 @@ export class TronUtil {
       energyShortage,
       bandwidthShortage,
     };
-  }
-
-  /**
-   * 估算 TRX 转账所需的带宽
-   * @param fromAddress 转账发起地址
-   * @param toAddress 接收地址
-   * @param amount 转账数量(单位: SUN)
-   * @returns 预估的带宽消耗
-   */
-  async estimateTrxBandwidth(
-    fromAddress: string,
-    toAddress: string,
-    amount: number,
-  ): Promise<number> {
-    // 构建 TRX 转账交易(不签名、不广播)
-    const transaction = await this.tronWeb.transactionBuilder.sendTrx(
-      toAddress,
-      amount,
-      fromAddress,
-    );
-
-    // 计算交易的字节大小来估算带宽
-    // 实际带宽消耗 ≈ 交易字节数
-    return JSON.stringify(transaction).length;
   }
 
   /**

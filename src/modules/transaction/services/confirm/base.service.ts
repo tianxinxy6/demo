@@ -59,7 +59,7 @@ export abstract class BaseConfirmService {
   async collect(): Promise<void> {
     const txs = await this.getTxList(TransactionStatus.CONFIRMED, 20);
     if (txs.length === 0) {
-      this.logger.debug(`No confirmed ${this.chainCode} transactions to collect`);
+      this.logger.debug(`No collect ${this.chainCode} transactions to collect`);
       return;
     }
 

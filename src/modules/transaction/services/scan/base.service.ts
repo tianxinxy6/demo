@@ -312,10 +312,10 @@ export abstract class BaseScanService {
 
     if (tx.contract?.address) {
       const tokenInfo = await this.getTokenSymbol(tx.contract.address);
-      entity.token = tokenInfo?.code || this.chainCode;
+      entity.token = tokenInfo?.code || 'TRC20';
       entity.decimals = tokenInfo?.decimals || 6;
     } else {
-      entity.token = 'TRC20';
+      entity.token = 'TRX';
       entity.decimals = 6;
     }
 

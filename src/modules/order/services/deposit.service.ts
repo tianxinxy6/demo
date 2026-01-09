@@ -48,7 +48,6 @@ export class DepositService {
     const order = queryRunner.manager.create(OrderDepositEntity, {
       userId: transaction.userId,
       token: transaction.token,
-      decimals: transaction.decimals,
       amount: transaction.amount,
       hash: transaction.hash,
       from: transaction.from,

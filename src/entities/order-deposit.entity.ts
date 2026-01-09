@@ -12,9 +12,6 @@ export class OrderDepositEntity extends CommonEntity {
   @Column({ comment: '用户ID', name: 'user_id', type: 'bigint' })
   userId: number;
 
-  @Column({ comment: '代币ID', name: 'token_id', type: 'int' })
-  tokenId: number;
-
   @Column({ comment: '代币代码', length: 50 })
   token: string;
 

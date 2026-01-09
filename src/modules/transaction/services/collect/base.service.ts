@@ -6,7 +6,6 @@ import { DatabaseService } from '@/shared/database/database.service';
 import { TransactionStatus } from '@/constants';
 import { SysWalletAddressService } from '@/modules/sys/services/sys-wallet.service';
 import { ConfigService } from '@nestjs/config';
-import { App } from 'supertest/types';
 import { AppConfigService } from '@/shared/services/config.service';
 
 /**

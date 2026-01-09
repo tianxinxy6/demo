@@ -4,6 +4,7 @@ import { TronUtil } from '@/utils/tron.util';
 import { BaseCollectService } from './base.service';
 import { BaseTransactionEntity } from '@/entities/txs/base.entity';
 import { TransactionCollectTronEntity } from '@/entities/txs/collect/transaction-tron.entity';
+import { DelegateService } from '@/modules/order/services';
 
 /**
  * TRON 归集服务
@@ -18,6 +19,10 @@ export class TronCollectService extends BaseCollectService {
 
   private tronUtil: TronUtil;
   private rpcUrl: string;
+
+  constructor(private readonly delegateService: DelegateService) {
+    super();
+  }
 
   protected buildEntity(): TransactionCollectTronEntity {
     return new TransactionCollectTronEntity();
@@ -110,7 +115,10 @@ export class TronCollectService extends BaseCollectService {
         Number(totalAmount),
       );
       // 需要手续费则跳过，等待带宽恢复后再归集
-      if (actualFee > 0) return;
+      if (actualFee > 0) {
+        this.logger.debug(`Fee is not enough to collect: ${actualFee}`);
+        return;
+      }
 
       // 计算可转账金额
       const transferAmount = totalAmount - actualFee;
@@ -159,10 +167,14 @@ export class TronCollectService extends BaseCollectService {
       );
 
       // 账户带宽不足，等待带宽恢复后再归集
-      if (gasInfo.bandwidthShortage > 0) return;
+      if (gasInfo.bandwidthShortage > 0) {
+        this.logger.debug(`Bandwidth is not enough to collect: ${gasInfo.bandwidthShortage}`);
+        return;
+      }
 
       if (gasInfo.energyShortage > 0) {
         // 能量不足，租借能量支付手续费
+        await this.delegateService.rentEnergy(relTx.to, gasInfo.energyShortage, 1800);
       }
 
       await this.transferTRC20Token(relTx, 0, callback);
