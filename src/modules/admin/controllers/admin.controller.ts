@@ -9,7 +9,7 @@ import { ApiKeyGuard } from '@/common/guards/api-key.guard';
  * 用于内部应用（如后台管理系统）调用的 API
  * 需要通过 API Key + HMAC 签名验证
  */
-@Controller('admin')
+@Controller({ path: 'admin', version: '' })
 @UseGuards(ApiKeyGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}

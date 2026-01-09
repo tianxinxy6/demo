@@ -4,7 +4,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from '@/common/decorators/public.decorator';
 
 @ApiTags('Health - 健康检查')
-@Controller('health')
+@Controller({ path: 'health', version: '' })
 export class HealthController {
   /**
    * 健康检查

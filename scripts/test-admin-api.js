@@ -3,7 +3,7 @@
  *
  * 使用方法：
  * 1. 配置环境变量：ADMIN_API_KEY, ADMIN_API_SECRET
- * 2. 运行: node test-admin-api.js
+ * 2. 运行: ADMIN_API_KEY="admin_your_api_key_here_32_chars" ADMIN_API_SECRET="your_secret_key_here_64_chars_long_for_hmac_signature_validation" node scripts/test-admin-api.js
  */
 
 const crypto = require('crypto');
@@ -88,7 +88,7 @@ class AdminApiClient {
    */
   async createMerchant(name) {
     const body = { name };
-    return this.request('POST', '/v1/admin/merchant', body);
+    return this.request('POST', '/admin/merchant', body);
   }
 }
 

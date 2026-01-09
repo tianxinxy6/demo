@@ -5,9 +5,6 @@
 // 错误码常量
 export * from './error-code.constant';
 
-// 签名验证常量
-export * from './signature.constant';
-
 // 响应常量
 export * from './response.constant';
 
@@ -15,3 +12,5 @@ export * from './response.constant';
 export * from './model.constant';
 
 export * from './cache.constant';
+
+export * from './price.constant';
