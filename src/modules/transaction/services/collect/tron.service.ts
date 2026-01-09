@@ -53,7 +53,8 @@ export class TronCollectService extends BaseCollectService {
   }
 
   async activateAddress(tx: BaseTransactionEntity): Promise<void> {
-    if (this.tronUtil.checkAddressActivated(tx.to)) {
+    await this.init();
+    if (await this.tronUtil.checkAddressActivated(tx.to)) {
       return;
     }
 

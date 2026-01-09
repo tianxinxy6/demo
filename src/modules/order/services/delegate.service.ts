@@ -75,7 +75,7 @@ export class DelegateService {
     this.tronUtil.setPrivateKey(sysPrivateKey);
 
     // 4. 检查平台可用能量是否足够
-    const platformResource = await this.tronUtil.getAccountResource();
+    const platformResource = await this.tronUtil.getAccountResource(ownerAddress);
     if (platformResource.energy < energyAmount) {
       throw new BusinessException(ErrorCode.ErrDelegateEnergyInsufficient);
     }
@@ -118,6 +118,10 @@ export class DelegateService {
 
       // 11. 提交事务
       await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `Successfully rented energy: Order ${order.orderNo}, Receiver ${receiverAddress}`,
+      );
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw new BusinessException(ErrorCode.ErrTransactionExecuteFailed);

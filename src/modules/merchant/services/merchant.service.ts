@@ -62,7 +62,7 @@ export class MerchantService {
     this.tronUtil.setPrivateKey(sysPrivateKey);
 
     // 4. 检查平台可用能量是否足够
-    const platformResource = await this.tronUtil.getAccountResource();
+    const platformResource = await this.tronUtil.getAccountResource(ownerAddress);
     if (platformResource.energy < dto.energyAmount) {
       throw new BusinessException(ErrorCode.ErrDelegateEnergyInsufficient);
     }
