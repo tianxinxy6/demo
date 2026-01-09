@@ -172,13 +172,21 @@ export class AppConfigService {
     // 根据链类型构建配置键名
     const configKey = `collect_wallet_address_${chainName.toLowerCase()}`;
 
-    return await this.get(configKey);
+    const value = await this.get(configKey);
+    if (!value) {
+      throw new Error(`Collect wallet address for ${chainName} is not configured`);
+    }
+    return value;
   }
 
   async getEnergyOwnerWallet(): Promise<string | null> {
     // 根据链类型构建配置键名
     const configKey = `energy_owner_address`;
 
-    return await this.get(configKey);
+    const value = await this.get(configKey);
+    if (!value) {
+      throw new Error('Energy owner wallet address is not configured');
+    }
+    return value;
   }
 }

@@ -1,20 +1,14 @@
 import { Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiHeader,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiBody,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiHeader, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { ApiAuthGuard } from '@/common/guards/api-auth.guard';
 import { AuthUser } from '@/common/decorators/auth-user.decorator';
 import { MerchantService } from '../services/merchant.service';
-import { RentEnergyDto, ReclaimEnergyDto } from '../dto/rent.dto';
+import { RentEnergyDto } from '../dto/rent.dto';
 import { RentEnergyResponse } from '../vo/energy.vo';
 import { WalletService } from '@/modules/user/services/wallet.service';
 import { WalletResponse } from '@/modules/user/vo';
 import { SkipSignature } from '@/common/decorators/signature.decorator';
+import { TronResource } from '@/utils';
 
 @ApiTags('Merchant - 商户API')
 @ApiHeader({
@@ -193,7 +187,7 @@ export class MerchantController {
     status: 401,
     description: '认证失败',
   })
-  async queryPlatformEnergy(): Promise<number> {
-    return this.merchantService.energyBalance();
+  async queryPlatformEnergy(): Promise<TronResource> {
+    return await this.merchantService.energyBalance();
   }
 }

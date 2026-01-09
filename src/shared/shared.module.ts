@@ -13,6 +13,8 @@ import { AppConfigService } from './services/config.service';
 import { AddressMgrService } from './services/wallet.service';
 import { VaultService } from './services/vault.service';
 
+const providers = [AppConfigService, AddressMgrService, VaultService];
+
 @Global()
 @Module({
   imports: [
@@ -54,14 +56,7 @@ import { VaultService } from './services/vault.service';
     // database
     DatabaseModule,
   ],
-  providers: [AppConfigService, AddressMgrService, VaultService],
-  exports: [
-    HttpModule,
-    AppCacheModule,
-    DatabaseModule,
-    VaultService,
-    AppConfigService,
-    AddressMgrService,
-  ],
+  providers,
+  exports: [HttpModule, AppCacheModule, DatabaseModule, ...providers],
 })
 export class SharedModule {}

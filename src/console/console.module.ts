@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { TestCommand } from './commands/test.command';
 import { CreateSysWalletCommand } from './commands/create-sys-wallet.command';
 import { DelegateEnergyCommand } from './commands/delegate-energy.command';
 import { UndelegateEnergyCommand } from './commands/undelegate-energy.command';
@@ -23,6 +22,6 @@ import config from '@/config';
     SysModule,
     SharedModule,
   ],
-  providers: [TestCommand, CreateSysWalletCommand, DelegateEnergyCommand, UndelegateEnergyCommand],
+  providers: [CreateSysWalletCommand, DelegateEnergyCommand, UndelegateEnergyCommand],
 })
 export class ConsoleModule {}

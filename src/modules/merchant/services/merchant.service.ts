@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { TronUtil } from '@/utils/tron.util';
+import { TronResource, TronUtil } from '@/utils/tron.util';
 import { generateOrderNo } from '@/utils';
 import { DelegateStatus, ErrorCode, WalletLogType } from '@/constants';
 import { BusinessException } from '@/common/exceptions/biz.exception';
@@ -62,12 +62,12 @@ export class MerchantService {
     this.tronUtil.setPrivateKey(sysPrivateKey);
 
     // 4. 检查平台可用能量是否足够
-    const platformEnergy = await this.tronUtil.getAccountEnergy();
-    if (platformEnergy < dto.energyAmount) {
+    const platformResource = await this.tronUtil.getAccountResource();
+    if (platformResource.energy < dto.energyAmount) {
       throw new BusinessException(ErrorCode.ErrDelegateEnergyInsufficient);
     }
 
-    const trxAmount = await this.tronUtil.convertEnergyToTrx(dto.energyAmount);
+    const trxAmount = await this.tronUtil.convertEnergyToTrx(ownerAddress, dto.energyAmount);
     if (trxAmount == 0) {
       throw new BusinessException(ErrorCode.ErrDelegateEnergyInsufficient);
     }
@@ -185,12 +185,12 @@ export class MerchantService {
     }
   }
 
-  async energyBalance(): Promise<number> {
+  async energyBalance(): Promise<TronResource> {
     // 获取系统钱包私钥
     const sysPrivateKey = await this.sysWalletService.getFeeWallet();
     this.tronUtil.setPrivateKey(sysPrivateKey);
 
-    return this.tronUtil.getAccountEnergy();
+    return this.tronUtil.getAccountResource();
   }
 
   /**

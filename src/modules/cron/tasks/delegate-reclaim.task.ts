@@ -2,12 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
 import { DelegateService } from '@/modules/order/services/delegate.service';
-import { WalletService } from '@/modules/user/services/wallet.service';
 import { SysWalletAddressService } from '@/modules/sys/services/sys-wallet.service';
 import { TronUtil } from '@/utils/tron.util';
 import { ConfigService } from '@nestjs/config';
-import { WalletLogType } from '@/constants';
 import { OrderDelegateEntity } from '@/entities/order-delegate.entity';
+import { AppConfigService } from '@/shared/services/config.service';
 
 /**
  * 委托订单能量回收定时任务
@@ -21,10 +20,10 @@ export class DelegateReclaimTask {
 
   constructor(
     private readonly delegateService: DelegateService,
-    private readonly walletService: WalletService,
     private readonly sysWalletService: SysWalletAddressService,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
+    private readonly appConfigService: AppConfigService,
   ) {
     const rpcUrl = this.configService.get<string>('tron.rpcUrl');
     this.tronUtil = new TronUtil(rpcUrl);
@@ -58,8 +57,14 @@ export class DelegateReclaimTask {
       const sysPrivateKey = await this.sysWalletService.getEnergyWallet();
       this.tronUtil.setPrivateKey(sysPrivateKey);
 
+      const ownerAddress = await this.appConfigService.getEnergyOwnerWallet();
+      if (!ownerAddress) {
+        this.logger.warn('能量所有者地址未配置，无法执行回收');
+        return;
+      }
+
       for (const order of expiredOrders) {
-        await this.reclaimSingleOrder(order);
+        await this.reclaimSingleOrder(order, ownerAddress);
         // 避免过快调用，稍作休息
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
@@ -73,8 +78,15 @@ export class DelegateReclaimTask {
   /**
    * 回收单个订单的能量
    */
-  private async reclaimSingleOrder(order: OrderDelegateEntity): Promise<void> {
-    const result = await this.tronUtil.undelegateResource(order.receiverAddress, order.trxAmount);
+  private async reclaimSingleOrder(
+    order: OrderDelegateEntity,
+    ownerAddress: string,
+  ): Promise<void> {
+    const result = await this.tronUtil.undelegateResourceWithPermission(
+      ownerAddress,
+      order.receiverAddress,
+      order.trxAmount,
+    );
     if (!result.result) {
       // 存储解析后的 message
       const fail = TronUtil.parseMessage(result.message);

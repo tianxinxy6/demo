@@ -57,8 +57,8 @@ export abstract class BaseConfirmService {
    * 将已确认的交易归集到系统钱包
    */
   async collect(): Promise<void> {
-    const pendingTxs = await this.getTxList(TransactionStatus.CONFIRMED, 20);
-    if (pendingTxs.length === 0) {
+    const txs = await this.getTxList(TransactionStatus.CONFIRMED, 20);
+    if (txs.length === 0) {
       this.logger.debug(`No confirmed ${this.chainCode} transactions to collect`);
       return;
     }
@@ -66,7 +66,7 @@ export abstract class BaseConfirmService {
     // to 地址去重
     const toAddresses = new Set<string>();
 
-    for (const tx of pendingTxs) {
+    for (const tx of txs) {
       try {
         // 如果该地址已经处理过，跳过
         if (toAddresses.has(tx.to)) {
@@ -111,7 +111,7 @@ export abstract class BaseConfirmService {
 
         // 如果交易确认成功，触发归集
         if (isSuccess) {
-          await this.triggerCollect(tx);
+          await this.triggerActivate(tx);
         }
       } catch (error) {
         this.logger.error(`Process ${this.chainCode} tx ${tx.hash} failed:`, error.message);
@@ -184,6 +184,12 @@ export abstract class BaseConfirmService {
       }
     });
   }
+
+  /**
+   * 激活地址 - 子类实现
+   * @param tx
+   */
+  protected async triggerActivate(tx: BaseTransactionEntity): Promise<void> {}
 
   /**
    * 初始化

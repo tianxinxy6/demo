@@ -41,6 +41,12 @@ export abstract class BaseCollectService {
   protected readonly databaseService: DatabaseService;
 
   /**
+   * 激活地址 - 子类实现
+   * @param tx
+   */
+  async activateAddress(tx: BaseTransactionEntity): Promise<void> {}
+
+  /**
    * 执行归集
    */
   async collect(tx: BaseTransactionEntity): Promise<void> {
@@ -77,6 +83,10 @@ export abstract class BaseCollectService {
    */
   protected getGasWalletPrivateKey(): Promise<string> {
     return this.sysWalletAddressService.getFeeWallet();
+  }
+
+  protected getEnergyWalletPrivateKey(): Promise<string> {
+    return this.sysWalletAddressService.getEnergyWallet();
   }
 
   /**

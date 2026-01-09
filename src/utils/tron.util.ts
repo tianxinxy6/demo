@@ -1,10 +1,24 @@
 import { TronWeb, Types } from 'tronweb';
+import { add } from 'winston';
 
 export interface TronAddressInfo {
   address: string;
   publicKey: string;
   privateKey: string;
   hexAddress: string;
+}
+
+export interface TronResource {
+  energy: number;
+  bandwidth: number;
+  totalEnergy: number;
+  totalBandwidth: number;
+}
+
+export interface GasInfo {
+  gas: bigint;
+  bandwidthShortage: number;
+  energyShortage: number;
 }
 
 /**
@@ -172,65 +186,6 @@ export class TronUtil {
     return await contractInstance.transfer(to, amount).send({
       from: fromAddress,
     });
-  }
-
-  /**
-   * 将能量数量转换为需要委托的 TRX 数量（单位：SUN）
-   *
-   * 原理：
-   * 1. 查询账户已质押的 TRX 数量（通过 getDelegatedResourceAccountIndexV2）
-   * 2. 查询账户的总能量（EnergyLimit）
-   * 3. 计算比例：委托TRX = (委托能量 / 总能量) × 质押TRX
-   *
-   * @param energyAmount 要委托的能量数量
-   * @param fromAddress 委托方地址（可选，默认使用当前实例地址）
-   * @returns 需要委托的 TRX 数量（单位：SUN）
-   */
-  async convertEnergyToTrx(energyAmount: number, fromAddress?: string): Promise<number> {
-    const address = fromAddress || this.getFromAddress();
-    if (!address) {
-      return 0;
-    }
-
-    // 获取账户资源信息
-    const accountResources = await this.tronWeb.trx.getAccountResources(address);
-    console.log('Account Resources:', accountResources);
-    // 获取账户的总能量
-    const totalEnergy = accountResources.EnergyLimit || 0;
-    if (energyAmount > totalEnergy) {
-      return 0;
-    }
-
-    // 获取账户信息，查找质押的 TRX
-    const account = await this.tronWeb.trx.getAccount(address);
-
-    // 从 account_resource 中获取质押的 TRX（Stake 2.0）
-    // frozenV2 是 Stake 2.0 的质押信息
-    let stakedTrxForEnergy = 0;
-
-    if (account.frozenV2) {
-      // Stake 2.0: 遍历 frozenV2 数组找到 ENERGY 类型的质押
-      for (const frozen of account.frozenV2) {
-        if (frozen.type === 'ENERGY') {
-          stakedTrxForEnergy += frozen.amount || 0;
-        }
-      }
-    }
-
-    // 如果使用旧版 Stake 1.0（已废弃，但仍需兼容）
-    if (stakedTrxForEnergy === 0 && account.account_resource?.frozen_balance_for_energy) {
-      stakedTrxForEnergy = account.account_resource.frozen_balance_for_energy.frozen_balance || 0;
-    }
-
-    if (stakedTrxForEnergy === 0) {
-      return 0;
-    }
-
-    // 计算需要委托的 TRX 数量（SUN）
-    // 公式：委托TRX = (委托能量 / 总能量) × 质押TRX
-    const trxToDelegate = (energyAmount / totalEnergy) * stakedTrxForEnergy;
-
-    return Math.floor(trxToDelegate);
   }
 
   /**
@@ -412,6 +367,40 @@ export class TronUtil {
     }
   }
 
+  /**
+   * 查询指定地址的质押 TRX 数量
+   * @param address 质押 TRX 的地址
+   * @returns 质押的 TRX 数量（单位：SUN）
+   */
+  async getStakedAmount(address?: string): Promise<number> {
+    const ownerAddress = address || this.getFromAddress();
+    if (!ownerAddress) {
+      return 0;
+    }
+    // 获取账户信息，查找质押的 TRX
+    const account = await this.tronWeb.trx.getAccount(ownerAddress);
+
+    // 从 account_resource 中获取质押的 TRX（Stake 2.0）
+    // frozenV2 是 Stake 2.0 的质押信息
+    let stakedTrxForEnergy = 0;
+
+    if (account.frozenV2) {
+      // Stake 2.0: 遍历 frozenV2 数组找到 ENERGY 类型的质押
+      for (const frozen of account.frozenV2) {
+        if (frozen.type === 'ENERGY') {
+          stakedTrxForEnergy += frozen.amount || 0;
+        }
+      }
+    }
+
+    // 如果使用旧版 Stake 1.0（已废弃，但仍需兼容）
+    if (stakedTrxForEnergy === 0 && account.account_resource?.frozen_balance_for_energy) {
+      stakedTrxForEnergy = account.account_resource.frozen_balance_for_energy.frozen_balance || 0;
+    }
+
+    return stakedTrxForEnergy;
+  }
+
   getFromAddress(): string | false {
     return this.tronWeb.defaultAddress.base58;
   }
@@ -471,7 +460,8 @@ export class TronUtil {
   async calculateTrxTransFee(address: string, toAddress: string, amount: number): Promise<bigint> {
     const bandwidth = await this.estimateTrxBandwidth(address, toAddress, amount);
 
-    return await this.calculateTrxFee(address, bandwidth, 0);
+    const gasInfo = await this.calculateTrxFee(address, bandwidth, 0);
+    return gasInfo.gas;
   }
 
   async calculateTrc20TransFee(
@@ -479,7 +469,7 @@ export class TronUtil {
     contractAddress: string,
     toAddress: string,
     amount: number,
-  ): Promise<bigint> {
+  ): Promise<GasInfo> {
     const { bandwidth, energy } = await this.estimateTrc20Transaction(
       address,
       contractAddress,
@@ -491,10 +481,10 @@ export class TronUtil {
   }
 
   /**
-   * 获取账户剩余能量
+   * 获取账户剩余资源
    */
-  async getAccountEnergy(): Promise<number> {
-    const address = this.getFromAddress();
+  async getAccountResource(targetAddress?: string): Promise<TronResource> {
+    const address = targetAddress || this.getFromAddress();
     if (!address) {
       throw new Error('Failed to derive address from private key');
     }
@@ -504,24 +494,16 @@ export class TronUtil {
     // 计算带宽费用
     const energyLimit = accountResources.EnergyLimit || 0;
     const energyUsed = accountResources.EnergyUsed || 0;
-    return energyLimit - energyUsed;
-  }
-
-  /**
-   * 获取账户剩余带宽
-   */
-  async getAccountBandwidth(): Promise<number> {
-    const address = this.getFromAddress();
-    if (!address) {
-      throw new Error('Failed to derive address from private key');
-    }
-    // 获取账户资源信息
-    const accountResources = await this.tronWeb.trx.getAccountResources(address);
 
     // 计算带宽费用
     const freeNetLimit = accountResources.freeNetLimit || 0;
     const freeNetUsed = accountResources.freeNetUsed || 0;
-    return freeNetLimit - freeNetUsed;
+    return {
+      energy: energyLimit - energyUsed,
+      totalEnergy: energyLimit,
+      bandwidth: freeNetLimit - freeNetUsed,
+      totalBandwidth: freeNetLimit,
+    };
   }
 
   /**
@@ -535,21 +517,13 @@ export class TronUtil {
     address: string,
     bandwidth: number,
     energy: number,
-  ): Promise<bigint> {
+  ): Promise<GasInfo> {
     // 获取账户资源信息
-    const accountResources = await this.tronWeb.trx.getAccountResources(address);
+    const accountResources = await this.getAccountResource(address);
 
-    // 计算带宽费用
-    const freeNetLimit = accountResources.freeNetLimit || 0;
-    const freeNetUsed = accountResources.freeNetUsed || 0;
-    const availableBandwidth = freeNetLimit - freeNetUsed;
-    const bandwidthShortage = availableBandwidth < bandwidth ? bandwidth - availableBandwidth : 0;
+    const bandwidthShortage = accountResources.bandwidth < bandwidth ? bandwidth : 0;
 
-    // 计算能量费用
-    const energyLimit = accountResources.EnergyLimit || 0;
-    const energyUsed = accountResources.EnergyUsed || 0;
-    const availableEnergy = energyLimit - energyUsed;
-    const energyShortage = availableEnergy < energy ? energy - availableEnergy : 0;
+    const energyShortage = accountResources.energy < energy ? energy - accountResources.energy : 0;
 
     // 动态获取资源价格
     const { bandwidthPrice, energyPrice } = await this.getResourcePrices();
@@ -558,7 +532,11 @@ export class TronUtil {
     const bandwidthFee = BigInt(bandwidthShortage) * bandwidthPrice;
     const energyFee = BigInt(energyShortage) * energyPrice;
 
-    return bandwidthFee + energyFee;
+    return {
+      gas: bandwidthFee + energyFee,
+      energyShortage,
+      bandwidthShortage,
+    };
   }
 
   /**
@@ -680,5 +658,32 @@ export class TronUtil {
       // 解析失败时返回原始消息
       return message;
     }
+  }
+
+  /**
+   * 将能量数量转换为需要委托的 TRX 数量（单位：SUN）
+   *
+   * 原理：
+   * 1. 查询账户已质押的 TRX 数量
+   * 2. 查询账户的总能量（EnergyLimit）
+   * 3. 计算比例：委托TRX = (委托能量 / 总能量) × 质押TRX
+   *
+   * @param energyAmount 要委托的能量数量
+   * @param fromAddress 委托方地址（可选，默认使用当前实例地址）
+   * @returns 需要委托的 TRX 数量（单位：SUN）
+   */
+  async convertEnergyToTrx(ownerAddress: string, energyAmount: number): Promise<number> {
+    // 获取账户信息，查找质押的 TRX
+    const resource = await this.getAccountResource(ownerAddress);
+
+    // 从 account_resource 中获取质押的 TRX（Stake 2.0）
+    // frozenV2 是 Stake 2.0 的质押信息
+    const stakedTrxForEnergy = await this.getStakedAmount(ownerAddress);
+
+    // 计算需要委托的 TRX 数量（SUN）
+    // 公式：委托TRX = (委托能量 / 总能量) × 质押TRX
+    const trxToDelegate = (energyAmount / resource.totalEnergy) * stakedTrxForEnergy;
+
+    return Math.floor(trxToDelegate);
   }
 }

@@ -97,7 +97,7 @@ export class DelegateEnergyCommand extends CommandRunner {
         energyAmount = options.energy;
 
         // 获取当前能量转换比例（从链上查询更准确）
-        trxAmount = await tronUtil.convertEnergyToTrx(energyAmount, ownerAddress);
+        trxAmount = await tronUtil.convertEnergyToTrx(ownerAddress, energyAmount);
 
         console.log(`\n💡 根据能量计算TRX数量:`);
         console.log(`  请求能量: ${energyAmount.toLocaleString()}`);

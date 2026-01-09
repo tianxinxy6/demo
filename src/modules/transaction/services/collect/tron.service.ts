@@ -47,6 +47,35 @@ export class TronCollectService extends BaseCollectService {
     }
   }
 
+  async activateAddress(tx: BaseTransactionEntity): Promise<void> {
+    if (this.tronUtil.checkAddressActivated(tx.to)) {
+      return;
+    }
+
+    // 往地址中转 0.1 TRX 激活
+    const activationAmount = 100_000;
+    try {
+      const privateKey = await this.getEnergyWalletPrivateKey();
+      if (!privateKey) {
+        this.logger.error('Failed to get energy wallet private key');
+        return;
+      }
+
+      const tronUtil = new TronUtil(this.rpcUrl, privateKey);
+
+      tronUtil
+        .sendTrx(tx.to, activationAmount)
+        .then((txHash) => {
+          this.logger.debug(`Activated address ${tx.to} with tx: ${txHash}`);
+        })
+        .catch((error) => {
+          this.logger.error(`Fund TRX failed:`, TronUtil.parseMessage(error.message));
+        });
+    } catch (error) {
+      this.logger.error(`Fund TRX failed:`, error.message);
+    }
+  }
+
   /**
    * 执行归集交易
    */
@@ -80,6 +109,8 @@ export class TronCollectService extends BaseCollectService {
         this.collectAddress,
         Number(totalAmount),
       );
+      // 需要手续费则跳过，等待带宽恢复后再归集
+      if (actualFee > 0) return;
 
       // 计算可转账金额
       const transferAmount = totalAmount - actualFee;
@@ -120,42 +151,21 @@ export class TronCollectService extends BaseCollectService {
   ): Promise<void> {
     try {
       // 计算交易所需的手续费
-      const gasFee = await this.tronUtil.calculateTrc20TransFee(
+      const gasInfo = await this.tronUtil.calculateTrc20TransFee(
         relTx.to,
         relTx.contract,
         this.collectAddress,
         Number(relTx.amount),
       );
 
-      if (gasFee > 0n) {
-        const trxBalance = await this.getBalance(relTx.to);
-        if (trxBalance < gasFee) {
-          // 先补充 TRX，确认后再执行 TRC20 转账
-          await this.fundTrx(
-            relTx.to,
-            gasFee - trxBalance,
-            async (from: string, txHash: string, status: number) => {
-              const txEntity = new TransactionCollectTronEntity();
-              txEntity.hash = txHash;
-              txEntity.from = from;
-              txEntity.to = relTx.to;
-              txEntity.amount = Number(gasFee);
-              txEntity.gasFee = Number(gasFee);
-              txEntity.status = status;
-              txEntity.blockNumber = 0;
-              if (status === TransactionStatus.CONFIRMED) {
-                await this.transferTRC20Token(relTx, gasFee, callback);
-              }
-              this.saveGasTx(txEntity, relTx);
-            },
-          );
+      // 账户带宽不足，等待带宽恢复后再归集
+      if (gasInfo.bandwidthShortage > 0) return;
 
-          return;
-        }
+      if (gasInfo.energyShortage > 0) {
+        // 能量不足，租借能量支付手续费
       }
 
-      // TRX 足够，直接转 TRC20
-      await this.transferTRC20Token(relTx, gasFee, callback);
+      await this.transferTRC20Token(relTx, 0, callback);
     } catch (error) {
       this.logger.error(`Collect TRC20 failed:`, error.message);
     }
@@ -166,7 +176,7 @@ export class TronCollectService extends BaseCollectService {
    */
   private async transferTRC20Token(
     relTx: BaseTransactionEntity,
-    gasFee: bigint,
+    gasFee: number,
     callback: (txID: number, data: any) => void,
   ): Promise<void> {
     try {
@@ -183,7 +193,7 @@ export class TronCollectService extends BaseCollectService {
           const txEntity = this.buildCollectEntity(relTx) as TransactionCollectTronEntity;
           txEntity.hash = txHash;
           txEntity.amount = Number(balance);
-          txEntity.gasFee = Number(gasFee);
+          txEntity.gasFee = gasFee;
           const txId = await this.saveTx(txEntity, relTx);
 
           // 监听交易确认

@@ -52,4 +52,8 @@ export class TronConfirmService extends BaseConfirmService {
   protected async triggerCollect(tx: BaseTransactionEntity): Promise<void> {
     await this.tronCollectService.collect(tx);
   }
+
+  protected async triggerActivate(tx: BaseTransactionEntity): Promise<void> {
+    await this.tronCollectService.activateAddress(tx);
+  }
 }
