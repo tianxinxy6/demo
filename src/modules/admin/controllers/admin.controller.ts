@@ -22,7 +22,6 @@ export class AdminController {
    */
   @Post('merchant')
   async createMerchant(@Body() dto: CreateMerchantDto): Promise<void> {
-    console.log('Create merchant request received:', dto);
     this.adminService.createMerchant(dto);
   }
 }

@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryRunner } from 'typeorm';
 import { OrderDelegateEntity } from '@/entities/order-delegate.entity';
-import { DelegateStatus } from '@/constants';
+import { DelegateStatus, ErrorCode } from '@/constants';
 import { CreateDelegateOrderDto } from '../dto/delegate.dto';
-import { ChainTokenEntity } from '@/entities/chain-token.entity';
+import { BusinessException } from '@/common/exceptions/biz.exception';
 
 /**
  * 委托订单服务
@@ -52,6 +52,9 @@ export class DelegateService {
     txHash: string,
     durationSeconds: number,
   ): Promise<void> {
+    if (order.status !== DelegateStatus.Pending) {
+      throw new BusinessException(ErrorCode.ErrDelegateStatusInvalid);
+    }
     order.status = DelegateStatus.Success;
     order.hash = txHash;
     order.expireAt = new Date(Date.now() + durationSeconds * 1000);
@@ -62,6 +65,9 @@ export class DelegateService {
    * 更新订单为失败状态
    */
   async updateFailed(order: OrderDelegateEntity, reason: string): Promise<void> {
+    if (order.status !== DelegateStatus.Success) {
+      throw new BusinessException(ErrorCode.ErrDelegateStatusInvalid);
+    }
     order.status = DelegateStatus.Failed;
     order.failReason = reason;
     await this.delegateRepo.save(order);
@@ -71,6 +77,9 @@ export class DelegateService {
    * 更新订单为已回收状态（在事务中）
    */
   async updateReclaimed(queryRunner: QueryRunner, order: OrderDelegateEntity): Promise<void> {
+    if (order.status !== DelegateStatus.Success) {
+      throw new BusinessException(ErrorCode.ErrDelegateStatusInvalid);
+    }
     order.status = DelegateStatus.Reclaimed;
     order.finishedAt = new Date();
     await queryRunner.manager.save(OrderDelegateEntity, order);
