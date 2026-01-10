@@ -165,11 +165,11 @@ export class IdempotenceInterceptor implements NestInterceptor {
     SetMetadata(HTTP_IDEMPOTENCE_KEY, idempotenceKey)(handler);
 
     if (idempotenceKey) {
-      // 使用 SETNX (SET if Not eXists) + EXPIRE 实现原子操作，防止竞态条件
-      // 返回 1 表示设置成功（key 不存在），返回 0 表示 key 已存在
-      const setResult = await redis.setnx(idempotenceKey, '0');
+      // 使用 SET NX EX 实现原子操作，防止竞态条件
+      // 返回 'OK' 表示设置成功（key 不存在），返回 null 表示 key 已存在
+      const setResult = await redis.set(idempotenceKey, '0', 'EX', expired, 'NX');
 
-      if (setResult === 0) {
+      if (!setResult) {
         // key 已存在，说明是重复请求
         const resultValue: '0' | '1' | null = (await redis.get(idempotenceKey)) as any;
 
@@ -181,8 +181,7 @@ export class IdempotenceInterceptor implements NestInterceptor {
         }[resultValue || '0'];
         throw new ConflictException(message);
       }
-      // 如果 setResult === 1，说明是第一个请求，设置过期时间
-      await redis.expire(idempotenceKey, expired);
+      // setResult === 'OK'，说明是第一个请求，过期时间已在 SET 命令中设置
     }
 
     return next.handle().pipe(

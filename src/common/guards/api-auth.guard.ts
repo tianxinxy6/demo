@@ -22,7 +22,7 @@ import { ErrorCode } from '@/constants/error-code.constant';
 @Injectable()
 export class ApiAuthGuard implements CanActivate {
   private readonly logger = new Logger(ApiAuthGuard.name);
-  private readonly TIMESTAMP_WINDOW = 30000; // 时间窗口30秒
+  private readonly TIMESTAMP_WINDOW = 60000; // 时间窗口1分钟
   private readonly CACHE_TTL = 600; // API Key缓存10分钟
 
   constructor(
@@ -89,18 +89,13 @@ export class ApiAuthGuard implements CanActivate {
         .digest('hex');
 
       if (signature !== expectedSignature) {
-        this.logger.debug(`Signature verification failed for API Key: ${apiKey}`);
-        this.logger.debug(`Expected signature string: ${signatureString}`);
-        this.logger.debug(`Method: ${method}, Path: ${path}, Query: ${queryString}`);
-        this.logger.debug(`Body: ${bodyString}, Timestamp: ${timestamp}`);
-        this.logger.debug(`Expected: ${expectedSignature}, Received: ${signature}`);
         throw new BusinessException(ErrorCode.ErrMerchantSignatureInvalid);
       }
 
       // 8. 将API Key信息附加到请求对象
       request.user = {
         uid: merchantEntity.userId,
-      };
+      } as IAuthUser;
 
       return true;
     } catch (error) {

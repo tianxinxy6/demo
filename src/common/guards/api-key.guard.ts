@@ -116,11 +116,11 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     const timestamp = parseInt(timestampStr, 10);
-    if (isNaN(timestamp)) {
+    if (isNaN(timestamp) || timestamp <= 0) {
       throw new BusinessException(ErrorCode.ErrTimestampInvalid);
     }
 
-    // 验证签名
+    // 验证签名（SignatureUtil.verify 内部包含完整的时间戳验证）
     const isValid = SignatureUtil.verify(this.adminApiSecret, signature, timestamp, request.body);
     if (!isValid) {
       throw new BusinessException(ErrorCode.ErrAdminSignatureInvalid);

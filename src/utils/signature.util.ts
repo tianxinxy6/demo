@@ -36,11 +36,18 @@ export class SignatureUtil {
     signature: string,
     timestamp: number,
     body: any = {},
-    tolerance: number = 5 * 60 * 1000, // 5分钟
+    tolerance: number = 60 * 1000, // 1分钟
   ): boolean {
-    // 验证时间戳
-    const timeDiff = Math.abs(Date.now() - timestamp);
-    if (timeDiff > tolerance) {
+    const now = Date.now();
+
+    // 拒绝未来时间戳（允许30秒时钟偏差）
+    if (timestamp > now + 30000) {
+      return false;
+    }
+
+    // 验证时间戳在容忍范围内（必须是过去的时间）
+    const timeDiff = now - timestamp;
+    if (timeDiff < 0 || timeDiff > tolerance) {
       return false;
     }
 

@@ -82,6 +82,36 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * 获取分布式锁并执行函数（2026 简洁版）
+   * @param key 锁的键
+   * @param fn 要执行的函数
+   * @param ttl 锁的过期时间（秒），默认 30 秒
+   */
+  async withLock<T>(key: string, fn: () => Promise<T>, ttl: number = 30): Promise<T> {
+    const lockKey = `lock:${key}`;
+    const lockValue = `${Date.now()}_${Math.random()}`;
+
+    // 尝试获取锁（SET NX EX 原子操作）
+    const acquired = await this.redis.set(lockKey, lockValue, 'EX', ttl, 'NX');
+
+    if (!acquired) {
+      throw new Error(`Resource locked: ${key}`);
+    }
+
+    try {
+      return await fn();
+    } finally {
+      // 使用 Lua 脚本安全释放锁（只删除自己的锁）
+      await this.redis.eval(
+        `if redis.call("get",KEYS[1]) == ARGV[1] then return redis.call("del",KEYS[1]) else return 0 end`,
+        1,
+        lockKey,
+        lockValue,
+      );
+    }
+  }
+
+  /**
    * 设置缓存
    */
   async set(key: string, value: any, options?: CacheOptions): Promise<'OK' | null> {

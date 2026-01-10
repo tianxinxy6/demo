@@ -9,6 +9,7 @@ import { WalletService } from '@/modules/user/services/wallet.service';
 import { WalletResponse } from '@/modules/user/vo';
 import { SkipSignature } from '@/common/decorators/signature.decorator';
 import { TronResource } from '@/utils';
+import { Idempotence } from '@/common/decorators/idempotence.decorator';
 
 @ApiTags('Merchant - 商户API')
 @ApiHeader({
@@ -98,6 +99,7 @@ export class MerchantController {
       },
     },
   })
+  @Idempotence()
   async rentEnergy(
     @AuthUser() user: IAuthUser,
     @Body() dto: RentEnergyDto,
