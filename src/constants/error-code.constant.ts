@@ -144,4 +144,11 @@ export enum ErrorCode {
   ErrAdminSignatureMissing = '34103:Admin 签名信息缺失',
   ErrAdminSignatureInvalid = '34104:Admin 签名验证失败',
   ErrAdminMerchantNameExists = '34105:商户名称已存在',
+
+  // merchant api (35xxx)
+  ErrMerchantApiKeyMissing = '35101:商户 API Key 缺失',
+  ErrMerchantApiKeyInvalid = '35102:商户 API Key 无效或已禁用',
+  ErrMerchantSignatureMissing = '35103:商户签名信息缺失',
+  ErrMerchantSignatureInvalid = '35104:商户签名验证失败',
+  ErrMerchantIpNotWhitelisted = '35105:IP 地址未在白名单中',
 }

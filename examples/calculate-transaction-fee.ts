@@ -86,7 +86,7 @@ async function calculateTrxTransferFee(tronUtil: TronUtil) {
     console.log('  - 如果 Bandwidth 不足，会燃烧 TRX (1000 SUN/Bandwidth)');
     console.log('  - 激活新账户需要额外 1 TRX');
   } catch (error) {
-    console.error('❌ 计算 TRX 转账费用失败:', error.message);
+    console.error('❌ 计算 TRX 转账费用失败:', error);
   }
 }
 
@@ -124,7 +124,7 @@ async function calculateTrc20TransferFee(tronUtil: TronUtil) {
     console.log('  - 如果 Energy 不足，燃烧 TRX (420 SUN/Energy，动态价格)');
     console.log('  - 建议提前租赁能量以降低手续费');
   } catch (error) {
-    console.error('❌ 计算 TRC20 转账费用失败:', error.message);
+    console.error('❌ 计算 TRC20 转账费用失败:', error);
   }
 }
 
@@ -161,7 +161,7 @@ async function checkAccountResources(tronUtil: TronUtil) {
     const stakedInTrx = TronUtil.fromSun(staked);
     console.log(`  - 质押 TRX: ${stakedInTrx} TRX`);
   } catch (error) {
-    console.error('❌ 查询账户资源失败:', error.message);
+    console.error('❌ 查询账户资源失败:', error);
   }
 }
 

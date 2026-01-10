@@ -175,7 +175,7 @@ export class TronCollectService extends BaseCollectService {
 
       if (gasInfo.energyShortage > 0) {
         // 能量不足，租借能量支付手续费
-        await this.delegateService.rentEnergy(relTx.to, gasInfo.energyShortage, 1800);
+        await this.delegateService.rentEnergy(relTx.to, gasInfo.energyShortage);
       }
 
       await this.transferTRC20Token(relTx, 0, callback);

@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  UnauthorizedException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/common';
 import { createHmac } from 'crypto';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,6 +6,8 @@ import { MerchantEntity } from '@/entities/merchant.entity';
 import { RedisService } from '@/shared/cache/redis.service';
 import { Status } from '@/constants';
 import { getClientIp } from '@/utils';
+import { BusinessException } from '@/common/exceptions/biz.exception';
+import { ErrorCode } from '@/constants/error-code.constant';
 
 /**
  * API 认证守卫
@@ -46,46 +42,36 @@ export class ApiAuthGuard implements CanActivate {
       const signature = request.headers['x-signature'];
 
       if (!apiKey || !timestamp || !signature) {
-        this.logger.warn(`Missing authentication headers from IP: ${clientIp}`);
-        throw new UnauthorizedException('Missing required authentication headers');
+        throw new BusinessException(ErrorCode.ErrMerchantSignatureMissing);
       }
 
       // 2. 验证时间戳 (提前验证，避免无效请求查询数据库)
       const now = Date.now();
       const requestTime = parseInt(timestamp, 10);
-
       if (isNaN(requestTime)) {
-        this.logger.warn(`Invalid timestamp format from IP: ${clientIp}`);
-        throw new UnauthorizedException('Invalid timestamp format');
+        throw new BusinessException(ErrorCode.ErrTimestampInvalid);
       }
 
       const timeDiff = Math.abs(now - requestTime);
       if (timeDiff > this.TIMESTAMP_WINDOW) {
-        this.logger.warn(
-          `Request timestamp expired from IP: ${clientIp}, time diff: ${timeDiff}ms`,
-        );
-        throw new UnauthorizedException('Request timestamp expired');
+        throw new BusinessException(ErrorCode.ErrTimestampInvalid);
       }
 
       // 3. 查询API Key（带缓存）
       const merchantEntity = await this.getMerchantWithCache(apiKey);
-
       if (!merchantEntity) {
-        this.logger.warn(`Invalid API Key attempt from IP: ${clientIp}`);
-        throw new UnauthorizedException('Invalid API Key');
+        throw new BusinessException(ErrorCode.ErrMerchantApiKeyInvalid);
       }
 
       // 4. 验证状态
       if (merchantEntity.status !== Status.Enabled) {
-        this.logger.warn(`Disabled API Key access attempt: ${apiKey}, IP: ${clientIp}`);
-        throw new UnauthorizedException('API Key is disabled');
+        throw new BusinessException(ErrorCode.ErrMerchantApiKeyInvalid);
       }
 
       // 5. 验证IP白名单
       if (merchantEntity.ipWhitelist && merchantEntity.ipWhitelist.length > 0) {
         if (!merchantEntity.ipWhitelist.includes(clientIp)) {
-          this.logger.warn(`IP not whitelisted for API Key: ${apiKey}, IP: ${clientIp}`);
-          throw new UnauthorizedException('IP not whitelisted');
+          throw new BusinessException(ErrorCode.ErrMerchantIpNotWhitelisted);
         }
       }
 
@@ -103,8 +89,12 @@ export class ApiAuthGuard implements CanActivate {
         .digest('hex');
 
       if (signature !== expectedSignature) {
-        this.logger.warn(`Invalid signature for API Key: ${apiKey}, IP: ${clientIp}`);
-        throw new UnauthorizedException('Invalid signature');
+        this.logger.debug(`Signature verification failed for API Key: ${apiKey}`);
+        this.logger.debug(`Expected signature string: ${signatureString}`);
+        this.logger.debug(`Method: ${method}, Path: ${path}, Query: ${queryString}`);
+        this.logger.debug(`Body: ${bodyString}, Timestamp: ${timestamp}`);
+        this.logger.debug(`Expected: ${expectedSignature}, Received: ${signature}`);
+        throw new BusinessException(ErrorCode.ErrMerchantSignatureInvalid);
       }
 
       // 8. 将API Key信息附加到请求对象
@@ -114,8 +104,13 @@ export class ApiAuthGuard implements CanActivate {
 
       return true;
     } catch (error) {
+      // 如果已经是 BusinessException，直接抛出
+      if (error instanceof BusinessException) {
+        throw error;
+      }
+      // 其他未知错误
       this.logger.error(`API authentication error from IP: ${clientIp}`, error.stack);
-      throw new UnauthorizedException('Authentication failed');
+      throw new BusinessException(ErrorCode.ErrMerchantApiKeyInvalid);
     }
   }
 

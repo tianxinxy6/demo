@@ -186,11 +186,13 @@ export class MerchantService {
   }
 
   async energyBalance(): Promise<TronResource> {
-    // 获取系统钱包私钥
-    const sysPrivateKey = await this.sysWalletService.getFeeWallet();
-    this.tronUtil.setPrivateKey(sysPrivateKey);
+    const ownerAddress = await this.appConfigService.getEnergyOwnerWallet();
+    if (!ownerAddress) {
+      this.logger.warn('能量所有者地址未配置');
+      throw new BusinessException(ErrorCode.ErrAddressInvalid);
+    }
 
-    return this.tronUtil.getAccountResource();
+    return this.tronUtil.getAccountResource(ownerAddress);
   }
 
   /**
