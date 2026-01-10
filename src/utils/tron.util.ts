@@ -78,18 +78,6 @@ export class TronUtil {
   }
 
   /**
-   * 验证私钥格式
-   */
-  static validatePrivateKey(privateKey: string): boolean {
-    try {
-      const cleanKey = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey;
-      return /^[a-fA-F0-9]{64}$/.test(cleanKey);
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
    * 将十六进制地址转换为 TRON 地址格式
    */
   static hexToAddress(hexAddress: string): string {
@@ -151,28 +139,24 @@ export class TronUtil {
    * 发送 TRX 交易
    */
   async sendTrx(to: string, amount: number): Promise<string> {
-    try {
-      const fromAddress = this.getFromAddress();
-      if (!fromAddress) {
-        throw new Error('Failed to derive address from private key');
-      }
-
-      // 构建交易
-      const transaction = await this.tronWeb.transactionBuilder.sendTrx(to, amount, fromAddress);
-
-      // 签名交易
-      const signedTx = await this.tronWeb.trx.sign(transaction);
-
-      // 广播交易
-      const broadcast = await this.tronWeb.trx.sendRawTransaction(signedTx);
-      if (!broadcast.result) {
-        throw new Error(`Transaction failed: ${TronUtil.parseMessage(broadcast.message)}`);
-      }
-
-      return broadcast.txid;
-    } catch (error) {
-      throw new Error(`Failed to send TRX: ${error.message}`);
+    const fromAddress = this.getFromAddress();
+    if (!fromAddress) {
+      throw new Error('Failed to derive address from private key');
     }
+
+    // 构建交易
+    const transaction = await this.tronWeb.transactionBuilder.sendTrx(to, amount, fromAddress);
+
+    // 签名交易
+    const signedTx = await this.tronWeb.trx.sign(transaction);
+
+    // 广播交易
+    const broadcast = await this.tronWeb.trx.sendRawTransaction(signedTx);
+    if (!broadcast.result) {
+      throw new Error(`to:${to}, Transaction failed: ${TronUtil.parseMessage(broadcast.message)}`);
+    }
+
+    return broadcast.txid;
   }
 
   async sendTrc20(to: string, amount: number, contract: string): Promise<string> {

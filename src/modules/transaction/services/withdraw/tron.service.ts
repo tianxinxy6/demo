@@ -72,25 +72,19 @@ export class TronWithdrawService extends BaseWithdrawService {
 
     const gasFee = await this.tronUtil.calculateTrxTransFee(this.addressFrom, order.to, amount);
 
-    this.tronUtil
-      .sendTrx(order.to, amount)
-      .then(async (hash) => {
-        // 创建提现交易记录
-        const txEntity = this.buildWithdrawEntity(order);
-        txEntity.hash = hash;
-        txEntity.amount = amount;
-        txEntity.gasFee = Number(gasFee);
-        const txId = await this.saveTx(txEntity, order);
+    this.tronUtil.sendTrx(order.to, amount).then(async (hash) => {
+      // 创建提现交易记录
+      const txEntity = this.buildWithdrawEntity(order);
+      txEntity.hash = hash;
+      txEntity.amount = amount;
+      txEntity.gasFee = Number(gasFee);
+      const txId = await this.saveTx(txEntity, order);
 
-        // 监听交易确认
-        this.watchTx(hash, (status, blockNumber) => {
-          callback(txId, order.id, { status, blockNumber });
-        });
-      })
-      .catch((error) => {
-        this.logger.error(`Withdraw TRX failed:`, error.message);
-        throw error;
+      // 监听交易确认
+      this.watchTx(hash, (status, blockNumber) => {
+        callback(txId, order.id, { status, blockNumber });
       });
+    });
   }
 
   /**
