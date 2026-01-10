@@ -60,45 +60,37 @@ export abstract class BaseWithdrawService {
    * 处理待转账的提现订单
    */
   async process(): Promise<void> {
-    try {
-      // 查询待处理的提现订单（从 WithdrawService 获取）
-      const orders = await this.withdrawService.getPendingWithdraws();
-      if (orders.length === 0) {
-        return;
+    // 查询待处理的提现订单（从 WithdrawService 获取）
+    const orders = await this.withdrawService.getPendingWithdraws();
+    if (orders.length === 0) {
+      return;
+    }
+
+    // 3. 获取提现钱包私钥
+    const privateKey = await this.sysWalletAddressService.getWithdrawWallet();
+    if (!privateKey) {
+      this.logger.error(`Withdraw wallet private key not found for chain ${this.chainCode}`);
+      return;
+    }
+
+    // 2. 初始化链连接
+    await this.init(privateKey);
+
+    this.logger.debug(`Found ${orders.length} approved withdraw orders for ${this.chainCode}`);
+
+    // 6. 处理每笔提现订单
+    for (const order of orders) {
+      const balance = await this.getBalance(this.addressFrom, order.contract);
+
+      if (balance < BigInt(order.actualAmount)) {
+        this.logger.error(
+          `Order ${order.id}: Insufficient balance ${balance} for withdraw amount ${order.actualAmount}`,
+        );
+        continue;
       }
 
-      // 3. 获取提现钱包私钥
-      const privateKey = await this.sysWalletAddressService.getWithdrawWallet();
-      if (!privateKey) {
-        this.logger.error(`Withdraw wallet private key not found for chain ${this.chainCode}`);
-        return;
-      }
-
-      // 2. 初始化链连接
-      await this.init(privateKey);
-
-      this.logger.debug(`Found ${orders.length} approved withdraw orders for ${this.chainCode}`);
-
-      // 6. 处理每笔提现订单
-      for (const order of orders) {
-        try {
-          const balance = await this.getBalance(this.addressFrom, order.contract);
-
-          if (balance < BigInt(order.actualAmount)) {
-            this.logger.error(
-              `Order ${order.id}: Insufficient balance ${balance} for withdraw amount ${order.actualAmount}`,
-            );
-            continue;
-          }
-
-          // 执行转账
-          await this.executetransfer(order);
-        } catch (error) {
-          this.logger.error(`Process withdraw order ${order.id} failed:`, error.message);
-        }
-      }
-    } catch (error) {
-      this.logger.error(`Process withdraws error:`, error.message);
+      // 执行转账
+      await this.executetransfer(order);
     }
   }
 
@@ -109,41 +101,31 @@ export abstract class BaseWithdrawService {
     txEntity: BaseTransactionEntity,
     order: OrderWithdrawEntity,
   ): Promise<number> {
-    try {
-      return await this.databaseService.runTransaction(async (queryRunner) => {
-        // 保存交易记录
-        const savedEntity = await queryRunner.manager.save(txEntity.constructor, txEntity);
+    return await this.databaseService.runTransaction(async (queryRunner) => {
+      // 保存交易记录
+      const savedEntity = await queryRunner.manager.save(txEntity.constructor, txEntity);
 
-        await this.withdrawService.editStatus(order.id, WithdrawalStatus.PROCESSING);
-        return savedEntity.id;
-      });
-    } catch (error) {
-      this.logger.error(`Save withdraw transaction failed:`, error.message);
-      throw error;
-    }
+      await this.withdrawService.editStatus(order.id, WithdrawalStatus.PROCESSING);
+      return savedEntity.id;
+    });
   }
 
   /**
    * 更新交易状态
    */
   async editTxStatus(txID: number, orderId: number, data: any): Promise<void> {
-    try {
-      await this.databaseService.runTransaction(async (queryRunner) => {
-        const txEntity = this.buildEntity();
-        const status = data.status;
-        if (status == TransactionStatus.CONFIRMED) {
-          // 如果交易确认，更新对应的提现订单状态为已完成
-          await this.withdrawService.settle(queryRunner, orderId, data.hash);
-        } else {
-          // 如果交易失败，更新对应的提现订单状态为失败
-          await this.withdrawService.fail(queryRunner, orderId, 'Transaction failed on chain');
-        }
-        await queryRunner.manager.update(txEntity.constructor, { id: txID }, data);
-      });
-    } catch (error) {
-      this.logger.error(`Update withdraw transaction status failed:`, error.message);
-      throw error;
-    }
+    await this.databaseService.runTransaction(async (queryRunner) => {
+      const txEntity = this.buildEntity();
+      const status = data.status;
+      if (status == TransactionStatus.CONFIRMED) {
+        // 如果交易确认，更新对应的提现订单状态为已完成
+        await this.withdrawService.settle(queryRunner, orderId, data.hash);
+      } else {
+        // 如果交易失败，更新对应的提现订单状态为失败
+        await this.withdrawService.fail(queryRunner, orderId, 'Transaction failed on chain');
+      }
+      await queryRunner.manager.update(txEntity.constructor, { id: txID }, data);
+    });
   }
 
   /**

@@ -163,13 +163,13 @@ export class DelegateService {
   /**
    * 更新订单为已回收状态（在事务中）
    */
-  async updateReclaimed(queryRunner: QueryRunner, order: OrderDelegateEntity): Promise<void> {
+  async updateReclaimed(order: OrderDelegateEntity): Promise<void> {
     if (order.status !== DelegateStatus.Success) {
       throw new BusinessException(ErrorCode.ErrDelegateStatusInvalid);
     }
     order.status = DelegateStatus.Reclaimed;
     order.finishedAt = new Date();
-    await queryRunner.manager.save(OrderDelegateEntity, order);
+    await this.delegateRepo.save(order);
   }
 
   /**

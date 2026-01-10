@@ -12,8 +12,9 @@ import { DatabaseModule } from './database/database.module';
 import { AppConfigService } from './services/config.service';
 import { AddressMgrService } from './services/wallet.service';
 import { VaultService } from './services/vault.service';
+import { TelegramAlertService } from './services/telegram-alert.service';
 
-const providers = [AppConfigService, AddressMgrService, VaultService];
+const providers = [AppConfigService, AddressMgrService, VaultService, TelegramAlertService];
 
 @Global()
 @Module({

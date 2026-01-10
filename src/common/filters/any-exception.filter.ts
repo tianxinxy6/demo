@@ -5,11 +5,13 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  Inject,
 } from '@nestjs/common';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { QueryFailedError } from 'typeorm';
 
 import { BusinessException } from '@/common/exceptions/biz.exception';
+import { TelegramAlertService } from '@/shared/services/telegram-alert.service';
 
 import { isDev } from '@/global/env';
 
@@ -31,9 +33,16 @@ interface MyError {
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
+  private static hookRegistered = false; // 防止重复注册
 
-  constructor() {
-    this.registerCatchAllExceptionsHook();
+  constructor(
+    @Inject(TelegramAlertService)
+    private readonly telegramAlert?: TelegramAlertService,
+  ) {
+    // 延迟注册钩子，确保服务已初始化
+    setImmediate(() => {
+      this.registerCatchAllExceptionsHook();
+    });
   }
 
   /**
@@ -55,6 +64,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (status === HttpStatus.INTERNAL_SERVER_ERROR && !(exception instanceof BusinessException)) {
       this.logger.error(`错误信息：(${status}) ${message} Path: ${decodeURI(url)}`);
 
+      // 发送 Telegram 告警
+      this.sendTelegramAlert(exception, url, request);
+
       // 生产环境下隐藏错误信息
       if (!isDev) message = 'Internal server error';
     } else {
@@ -63,14 +75,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const apiErrorCode = exception instanceof BusinessException ? exception.getErrorCode() : status;
 
-    // 返回基础响应结果
-    const resBody: IBaseResponse = {
+    response.status(status).send({
       code: apiErrorCode,
       message,
       data: null,
-    };
-
-    response.status(status).send(resBody);
+    });
   }
 
   /**
@@ -112,12 +121,51 @@ export class AllExceptionsFilter implements ExceptionFilter {
    * 捕获未处理的 Promise 拒绝和未捕获的异常
    */
   registerCatchAllExceptionsHook() {
+    // 防止重复注册
+    if (AllExceptionsFilter.hookRegistered) {
+      return;
+    }
+    AllExceptionsFilter.hookRegistered = true;
+
     process.on('unhandledRejection', (reason) => {
       this.logger.error('unhandledRejection: ', reason);
+      this.sendTelegramAlert(reason, 'unhandledRejection');
     });
 
-    process.on('uncaughtException', (err) => {
-      this.logger.error('uncaughtException: ', err);
+    process.on('uncaughtException', (error) => {
+      this.logger.error('uncaughtException: ', error);
+      this.sendTelegramAlert(error, 'uncaughtException');
+    });
+  }
+
+  /**
+   * 发送 Telegram 告警
+   */
+  private sendTelegramAlert(exception: unknown, url: string, request?: FastifyRequest): void {
+    if (!this.telegramAlert) {
+      return;
+    }
+
+    // 异步发送，不阻塞响应
+    setImmediate(async () => {
+      try {
+        const errorMessage = this.getErrorMessage(exception);
+        const context: any = { url };
+
+        if (request) {
+          context.method = request.method;
+          context.ip = request.ip;
+        }
+
+        if (exception instanceof Error && exception.stack) {
+          context.stack = exception.stack.split('\n').slice(0, 5).join('\n');
+        }
+
+        await this.telegramAlert.sendErrorAlert('系统异常', errorMessage, context);
+      } catch (error) {
+        // 发送告警失败不影响主流程，只记录日志
+        this.logger.debug('发送 Telegram 告警失败', error);
+      }
     });
   }
 }

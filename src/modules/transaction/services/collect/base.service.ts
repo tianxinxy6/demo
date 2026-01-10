@@ -49,32 +49,28 @@ export abstract class BaseCollectService {
    * 执行归集
    */
   async collect(tx: BaseTransactionEntity): Promise<void> {
-    try {
-      // 3. 初始化链连接
-      await this.init();
+    // 3. 初始化链连接
+    await this.init();
 
-      this.collectAddress = await this.appConfigService.getCollectWalletAddress(this.chainCode);
+    this.collectAddress = await this.appConfigService.getCollectWalletAddress(this.chainCode);
 
-      // 4. 检查来源地址余额是否足够
-      const balance = await this.getBalance(tx.to, tx.contract);
-      if (BigInt(balance) <= BigInt(0)) {
-        // 余额不足，已归集过
-        const queryRunner = this.dataSource.createQueryRunner();
-        this.editRelTxStatus(queryRunner, tx);
-        return;
-      }
-
-      // 获取 to 地址的私钥
-      const privateKey = await this.chainAddressService.getPrivateKey(tx.to);
-      if (!privateKey) {
-        return;
-      }
-
-      // 5. 执行链上归集交易
-      this.executeCollect(tx, privateKey);
-    } catch (error) {
-      this.logger.error(`Collect error for ${tx.from}:`, error.message);
+    // 4. 检查来源地址余额是否足够
+    const balance = await this.getBalance(tx.to, tx.contract);
+    if (BigInt(balance) <= BigInt(0)) {
+      // 余额不足，已归集过
+      const queryRunner = this.dataSource.createQueryRunner();
+      this.editRelTxStatus(queryRunner, tx);
+      return;
     }
+
+    // 获取 to 地址的私钥
+    const privateKey = await this.chainAddressService.getPrivateKey(tx.to);
+    if (!privateKey) {
+      return;
+    }
+
+    // 5. 执行链上归集交易
+    this.executeCollect(tx, privateKey);
   }
 
   /**
@@ -96,19 +92,14 @@ export abstract class BaseCollectService {
    * @returns 保存成功的归集交易主键ID
    */
   async saveTx(txEntity: BaseTransactionEntity, relTx: BaseTransactionEntity): Promise<number> {
-    try {
-      return await this.databaseService.runTransaction(async (queryRunner) => {
-        // 2. 保存归集交易记录
-        const savedEntity = await queryRunner.manager.save(txEntity.constructor, txEntity);
+    return await this.databaseService.runTransaction(async (queryRunner) => {
+      // 2. 保存归集交易记录
+      const savedEntity = await queryRunner.manager.save(txEntity.constructor, txEntity);
 
-        // 3. 更新原始充值交易为已归集
-        this.editRelTxStatus(queryRunner, relTx);
-        return savedEntity.id;
-      });
-    } catch (error) {
-      this.logger.error(`Save collect transaction failed:`, error.message);
-      throw error;
-    }
+      // 3. 更新原始充值交易为已归集
+      this.editRelTxStatus(queryRunner, relTx);
+      return savedEntity.id;
+    });
   }
 
   /**
@@ -116,22 +107,17 @@ export abstract class BaseCollectService {
    * @param relTx
    */
   async saveGasTx(txEntity: BaseTransactionEntity, relTx: BaseTransactionEntity): Promise<void> {
-    try {
-      await this.databaseService.runTransaction(async (queryRunner) => {
-        // 1. 构建归集交易实体
-        txEntity.userId = relTx.userId;
-        txEntity.relId = relTx.id;
-        txEntity.token = 'TRX';
-        txEntity.decimals = 6;
-        txEntity.blockNumber = 0;
+    await this.databaseService.runTransaction(async (queryRunner) => {
+      // 1. 构建归集交易实体
+      txEntity.userId = relTx.userId;
+      txEntity.relId = relTx.id;
+      txEntity.token = 'TRX';
+      txEntity.decimals = 6;
+      txEntity.blockNumber = 0;
 
-        // 2. 保存归集交易记录
-        await queryRunner.manager.save(txEntity.constructor, txEntity);
-      });
-    } catch (error) {
-      this.logger.error(`Save gas collect transaction failed:`, error.message);
-      throw error;
-    }
+      // 2. 保存归集交易记录
+      await queryRunner.manager.save(txEntity.constructor, txEntity);
+    });
   }
 
   /**
@@ -147,16 +133,11 @@ export abstract class BaseCollectService {
   }
 
   async editTxStatus(txID: number, data: any): Promise<void> {
-    try {
-      await this.databaseService.runTransaction(async (queryRunner) => {
-        const txEntity = this.buildEntity();
-        // 1. 更新归集交易状态
-        await queryRunner.manager.update(txEntity.constructor, { id: txID }, data);
-      });
-    } catch (error) {
-      this.logger.error(`Edit collect transaction status failed:`, error.message);
-      throw error;
-    }
+    await this.databaseService.runTransaction(async (queryRunner) => {
+      const txEntity = this.buildEntity();
+      // 1. 更新归集交易状态
+      await queryRunner.manager.update(txEntity.constructor, { id: txID }, data);
+    });
   }
 
   /**

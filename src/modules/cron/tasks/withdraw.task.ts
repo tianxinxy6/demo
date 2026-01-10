@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { TronWithdrawService } from '@/modules/transaction/services/withdraw/tron.service';
+import { CronErrorHandler } from '@/common/decorators/cron-error-handler.decorator';
 
 /**
  * 提现处理定时任务
@@ -14,6 +15,7 @@ export class WithdrawTask {
    * TRON 提现处理 - 每30秒执行一次
    */
   @Cron('*/30 * * * * *')
+  @CronErrorHandler('TRON提现处理')
   async processTron(): Promise<void> {
     await this.tronWithdrawService.process();
   }

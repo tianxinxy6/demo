@@ -38,7 +38,6 @@ export abstract class BaseConfirmService {
    */
   async confirm(): Promise<void> {
     if (this.isConfirming) {
-      this.logger.debug(`${this.chainCode} confirm running, skip`);
       return;
     }
 
@@ -47,6 +46,7 @@ export abstract class BaseConfirmService {
       await this.process();
     } catch (error) {
       this.logger.error(`${this.chainCode} confirm failed:`, error.message);
+      throw error;
     } finally {
       this.isConfirming = false;
     }
@@ -67,19 +67,15 @@ export abstract class BaseConfirmService {
     const toAddresses = new Set<string>();
 
     for (const tx of txs) {
-      try {
-        // 如果该地址已经处理过，跳过
-        if (toAddresses.has(tx.to)) {
-          continue;
-        }
-
-        await this.triggerCollect(tx);
-
-        // 标记该地址已处理
-        toAddresses.add(tx.to);
-      } catch (error) {
-        this.logger.error(`Collect ${this.chainCode} tx ${tx.hash} failed:`, error.message);
+      // 如果该地址已经处理过，跳过
+      if (toAddresses.has(tx.to)) {
+        continue;
       }
+
+      await this.triggerCollect(tx);
+
+      // 标记该地址已处理
+      toAddresses.add(tx.to);
     }
   }
 
@@ -100,21 +96,17 @@ export abstract class BaseConfirmService {
 
     const latestBlock = await this.getLatestBlockNumber();
     for (const tx of pending) {
-      try {
-        // 这里需要先判断是否满足确认数，再进行链上验证
-        if (latestBlock - tx.blockNumber < this.requiredConfirm) {
-          continue;
-        }
-        const isSuccess = await this.checkStatus(tx.hash);
+      // 这里需要先判断是否满足确认数，再进行链上验证
+      if (latestBlock - tx.blockNumber < this.requiredConfirm) {
+        continue;
+      }
+      const isSuccess = await this.checkStatus(tx.hash);
 
-        await this.confirmTx(tx.hash, latestBlock, isSuccess);
+      await this.confirmTx(tx.hash, latestBlock, isSuccess);
 
-        // 如果交易确认成功，触发归集
-        if (isSuccess) {
-          await this.triggerActivate(tx);
-        }
-      } catch (error) {
-        this.logger.error(`Process ${this.chainCode} tx ${tx.hash} failed:`, error.message);
+      // 如果交易确认成功，触发归集
+      if (isSuccess) {
+        await this.triggerActivate(tx);
       }
     }
   }
@@ -150,38 +142,33 @@ export abstract class BaseConfirmService {
   async confirmTx(txHash: string, confirmBlock?: number, success?: boolean): Promise<void> {
     const entity = this.buildEntity();
     await this.databaseService.runTransaction(async (queryRunner) => {
-      try {
-        // 1. 先获取交易记录
-        const transaction = await queryRunner.manager.findOne(entity.constructor, {
-          where: { hash: txHash },
-        } as any);
+      // 1. 先获取交易记录
+      const transaction = await queryRunner.manager.findOne(entity.constructor, {
+        where: { hash: txHash },
+      } as any);
 
-        if (!transaction) {
-          this.logger.warn(`Transaction not found: ${txHash}`);
-          throw new BusinessException(ErrorCode.ErrTransactionNotFound);
-        }
-
-        // 2. 确定交易状态
-        const status = success === false ? TransactionStatus.FAILED : TransactionStatus.CONFIRMED;
-
-        // 3. 更新交易状态
-        transaction.status = status;
-
-        // 4. 保存交易记录
-        await queryRunner.manager.save(entity.constructor, transaction);
-
-        // 5. 如果是成功的充值交易，处理充值订单
-        await this.depositService.confirm(
-          queryRunner,
-          transaction as BaseTransactionEntity,
-          success,
-          confirmBlock,
-          success ? undefined : 'Transaction failed',
-        );
-      } catch (error) {
-        this.logger.error(`Failed to confirm transaction ${txHash}:`, error);
-        throw error;
+      if (!transaction) {
+        this.logger.warn(`Transaction not found: ${txHash}`);
+        throw new BusinessException(ErrorCode.ErrTransactionNotFound);
       }
+
+      // 2. 确定交易状态
+      const status = success === false ? TransactionStatus.FAILED : TransactionStatus.CONFIRMED;
+
+      // 3. 更新交易状态
+      transaction.status = status;
+
+      // 4. 保存交易记录
+      await queryRunner.manager.save(entity.constructor, transaction);
+
+      // 5. 如果是成功的充值交易，处理充值订单
+      await this.depositService.confirm(
+        queryRunner,
+        transaction as BaseTransactionEntity,
+        success,
+        confirmBlock,
+        success ? undefined : 'Transaction failed',
+      );
     });
   }
 

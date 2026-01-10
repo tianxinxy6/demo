@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { DataSource } from 'typeorm';
 import { DelegateService } from '@/modules/order/services/delegate.service';
 import { SysWalletAddressService } from '@/modules/sys/services/sys-wallet.service';
 import { TronUtil } from '@/utils/tron.util';
 import { ConfigService } from '@nestjs/config';
 import { OrderDelegateEntity } from '@/entities/order-delegate.entity';
 import { AppConfigService } from '@/shared/services/config.service';
+import { CronErrorHandler } from '@/common/decorators/cron-error-handler.decorator';
 
 /**
  * 委托订单能量回收定时任务
@@ -21,7 +21,6 @@ export class DelegateReclaimTask {
   constructor(
     private readonly delegateService: DelegateService,
     private readonly sysWalletService: SysWalletAddressService,
-    private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
     private readonly appConfigService: AppConfigService,
   ) {
@@ -34,17 +33,15 @@ export class DelegateReclaimTask {
    * Cron表达式: 每分钟的第0秒执行
    */
   @Cron(CronExpression.EVERY_MINUTE)
+  @CronErrorHandler('能量回收任务')
   async reclaimExpiredOrders(): Promise<void> {
     // 防止并发执行
     if (this.isRunning) {
-      this.logger.debug('上一次扫描任务仍在运行中，跳过本次执行');
       return;
     }
 
     this.isRunning = true;
     try {
-      this.logger.debug('开始扫描过期委托订单...');
-
       // 查询过期订单（每次处理10个，避免一次性处理过多）
       const expiredOrders = await this.delegateService.findExpiredOrders();
       if (expiredOrders.length === 0) {
@@ -70,6 +67,7 @@ export class DelegateReclaimTask {
       }
     } catch (error) {
       this.logger.error(`扫描过期订单失败: ${error.message}`, error.stack);
+      throw error;
     } finally {
       this.isRunning = false;
     }
@@ -94,22 +92,7 @@ export class DelegateReclaimTask {
       return;
     }
 
-    // 使用事务确保数据一致性
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      // 2. 更新订单状态为已回收
-      await this.delegateService.updateReclaimed(queryRunner, order);
-
-      // 3. 提交事务
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw new Error(`数据库事务失败: ${error.message}`);
-    } finally {
-      await queryRunner.release();
-    }
+    // 更新订单状态为已回收
+    await this.delegateService.updateReclaimed(order);
   }
 }
