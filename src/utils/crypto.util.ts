@@ -1,6 +1,4 @@
 import * as crypto from 'crypto';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-import keccak256Hash = require('js-sha3');
 
 /**
  * 加密工具函数（纯函数，无依赖）
@@ -105,23 +103,6 @@ export function md5(data: string): string {
     throw new Error('md5: data cannot be null or undefined');
   }
   return crypto.createHash('md5').update(data).digest('hex');
-}
-
-/**
- * 计算 Keccak256 哈希（用于以太坊）
- *
- * 说明：Keccak256 不在 Node.js crypto 中，需要使用 js-sha3
- * 如果未安装可暂时使用 SHA3-256 替代
- */
-export function keccak256(data: string): string {
-  try {
-    return keccak256Hash.keccak_256(data);
-  } catch {
-    // 备用方案：使用 SHA3-256（需要 npm install sha3）
-    // 注：这是降级方案，生产环境应确保 js-sha3 已安装
-    // 可以在应用启动时检查依赖并记录警告日志
-    return crypto.createHash('sha3-256').update(data).digest('hex');
-  }
 }
 
 /**

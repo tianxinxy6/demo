@@ -5,19 +5,21 @@ import { BaseTransactionEntity } from '@/entities/txs/base.entity';
 import { BaseWithdrawService } from './base.service';
 import { TransactionOutTronEntity } from '@/entities/txs/withdraw/transaction-tron.entity';
 import { OrderWithdrawEntity } from '@/entities/order-withdraw.entity';
+import { DelegateService } from '@/modules/order/services';
 
 /**
  * TRON 提现转账服务
  * 处理 TRON 链的提现转账（包括 TRX 和 TRC20 代币）
- *
- * 继承自 BaseWithdrawService，自动获得父类的所有依赖注入
- * 不需要构造函数
  */
 @Injectable()
 export class TronWithdrawService extends BaseWithdrawService {
   protected readonly chainCode = 'TRON';
 
   private tronUtil: TronUtil;
+
+  constructor(private readonly delegateService: DelegateService) {
+    super();
+  }
 
   protected buildEntity(): BaseTransactionEntity {
     return new TransactionOutTronEntity();
@@ -71,6 +73,10 @@ export class TronWithdrawService extends BaseWithdrawService {
     const amount = Number(order.actualAmount);
 
     const gasFee = await this.tronUtil.calculateTrxTransFee(this.addressFrom, order.to, amount);
+    if (gasFee > 0) {
+      this.logger.debug(`Fee is not enough to collect: ${gasFee}`);
+      return;
+    }
 
     this.tronUtil.sendTrx(order.to, amount).then(async (hash) => {
       // 创建提现交易记录
@@ -96,12 +102,6 @@ export class TronWithdrawService extends BaseWithdrawService {
   ): Promise<void> {
     const amount = Number(order.actualAmount);
 
-    const fromAddress = this.tronUtil.getFromAddress();
-    if (!fromAddress) {
-      this.logger.error('Failed to get from address for TRC20 withdraw');
-      return;
-    }
-
     const gasInfo = await this.tronUtil.calculateTrc20TransFee(
       this.addressFrom,
       order.contract,
@@ -109,35 +109,32 @@ export class TronWithdrawService extends BaseWithdrawService {
       amount,
     );
 
-    const gasFee = gasInfo.gas;
-    // 检查 ETH 余额是否足够支付 gas费
-    const trxBalance = await this.getBalance(fromAddress);
-    if (trxBalance < BigInt(gasFee)) {
-      this.logger.error(
-        `Insufficient TRX balance ${trxBalance} to cover gas fee ${gasFee} for TRC20 withdraw`,
-      );
+    // 账户带宽不足，等待带宽恢复后再归集
+    if (gasInfo.bandwidthShortage > 0) {
+      this.logger.debug(`Bandwidth is not enough to collect: ${gasInfo.bandwidthShortage}`);
       return;
     }
 
-    this.tronUtil
-      .sendTrc20(order.to, amount, order.contract)
-      .then(async (hash) => {
-        // 创建提现交易记录
-        const txEntity = this.buildWithdrawEntity(order);
-        txEntity.hash = hash;
-        txEntity.amount = amount;
-        txEntity.gasFee = Number(gasFee);
-        const txId = await this.saveTx(txEntity, order);
+    if (gasInfo.energyShortage > 0) {
+      // 能量不足，租借能量支付手续费
+      await this.delegateService.rentEnergy(this.addressFrom, gasInfo.energyShortage);
+    }
 
-        // 监听交易确认
-        this.watchTx(hash, (status, blockNumber) => {
-          callback(txId, order.id, { status, blockNumber });
-        });
-      })
-      .catch((error) => {
-        this.logger.error(`Withdraw TRC20 failed:`, error.message);
-        throw error;
+    const gasFee = gasInfo.gas;
+
+    this.tronUtil.sendTrc20(order.to, amount, order.contract).then(async (hash) => {
+      // 创建提现交易记录
+      const txEntity = this.buildWithdrawEntity(order);
+      txEntity.hash = hash;
+      txEntity.amount = amount;
+      txEntity.gasFee = Number(gasFee);
+      const txId = await this.saveTx(txEntity, order);
+
+      // 监听交易确认
+      this.watchTx(hash, (status, blockNumber) => {
+        callback(txId, order.id, { status, blockNumber });
       });
+    });
   }
 
   /**

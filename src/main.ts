@@ -1,6 +1,7 @@
 import cluster from 'node:cluster';
-
 import path from 'node:path';
+
+import fastifyCompress from '@fastify/compress';
 import { Logger, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -12,7 +13,6 @@ import { fastifyApp } from './common/adapters/fastify.adapter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { isDev, isMainProcess } from './global/env';
 import { setupSwagger, setupMerchantSwagger } from './setup-swagger';
-import compression from 'compression';
 
 declare const module: any;
 
@@ -43,7 +43,10 @@ async function bootstrap() {
   });
 
   // 压缩中间件 压缩可以大大减小响应主体的大小，从而提高 Web 应用程序的速度。
-  app.use(compression());
+  await app.register(fastifyCompress, {
+    global: true,
+    encodings: ['gzip', 'deflate'],
+  });
 
   app.setGlobalPrefix(globalPrefix);
 
