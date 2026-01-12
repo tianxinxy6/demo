@@ -5,6 +5,7 @@ export class Bcrypt {
    * 用于哈希密码的盐
    */
   private static readonly SALT_ROUNDS: number = 10;
+
   /**
    * 对比检查密码
    * @param { string } rawStr 要比较的数据, 使用登录时传递过来的密码
@@ -13,6 +14,7 @@ export class Bcrypt {
   static compare(rawStr: string, hashedStr: string) {
     return bcrypt.compare(rawStr, hashedStr);
   }
+
   /**
    * 生成 hash
    * @param { string } rawStr 要加密的数据
